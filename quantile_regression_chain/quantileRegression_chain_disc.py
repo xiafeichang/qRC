@@ -9,12 +9,12 @@ import pickle as pkl
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
 
 from sklearn.ensemble import GradientBoostingRegressor
-from ..tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
-from ..tmva.eleIdMVAComputer import eleIdMvaComputer, helpComputeEleIdMva
-from Corrector import Corrector, applyCorrection
-from qRC.python.quantileRegression_chain import quantileRegression_chain, trainClf
-from qRC.python.Shifter import Shifter, applyShift
-from qRC.python.Shifter2D import Shifter2D, apply2DShift
+from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
+from .tmva.eleIdMVAComputer import eleIdMvaComputer, helpComputeEleIdMva
+from .Corrector import Corrector, applyCorrection
+from .quantileRegression_chain import quantileRegression_chain, trainClf
+from .Shifter import Shifter, applyShift
+from .Shifter2D import Shifter2D, apply2DShift
 
 import logging
 logger = logging.getLogger(__name__)
