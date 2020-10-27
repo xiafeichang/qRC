@@ -1,32 +1,75 @@
-annimport argparse
+import argparse
 import yaml
-import qRC.python.quantileRegression_chain as QReg_C
+from quantile_regression_chain.quantileRegression_chain import quantileRegression_chain as QReg_C
 
 
-def main(options):
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+            description = 'Required Arguments')
+    parser.add_argument('-D','--sourceDir', action='store', required=True, type = str)
+    parser.add_argument('-O','--outDir', action='store', required=True, type = str)
+    parser.add_argument('-y','--year', action='store', required=True, type = int)
+    parser.add_argument('-E','--EBEE', action='store', required=True, type = str)
+    parser.add_argument('-s','--split', action='store', type=float)
 
-    qRC = QReg_C.quantileRegression_chain(options.year, options.EBEE, options.outDir, ['probeR9'])
-    
-    qRC.loadROOT('{}/outputMC.root'.format(options.sourceDir), 'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All', 'df_mc_{}'.format(qRC.EBEE), 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeChIso03<6 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0', options.split)
-    qRC.loadROOT('{}/outputData.root'.format(options.sourceDir), 'tagAndProbeDumper/trees/Data_13TeV_All', 'df_data_{}'.format(qRC.EBEE), 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeChIso03<6 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0', options.split)
+    return parser.parse_args()
 
-    if options.EBEE == 'EB':
-        qRC.loadROOT('{}/outputMC.root'.format(options.sourceDir), 'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All', 'df_mc_{}_Iso'.format(qRC.EBEE), 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.0105 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0', options.split)
-        qRC.loadROOT('{}/outputData.root'.format(options.sourceDir), 'tagAndProbeDumper/trees/Data_13TeV_All', 'df_data_{}_Iso'.format(qRC.EBEE), 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.0105 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0', options.split)
-    elif options.EBEE == 'EE':
-        qRC.loadROOT('{}/outputMC.root'.format(options.sourceDir), 'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All', 'df_mc_{}_Iso'.format(qRC.EBEE), 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.028 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0', options.split)
-        qRC.loadROOT('{}/outputData.root'.format(options.sourceDir), 'tagAndProbeDumper/trees/Data_13TeV_All', 'df_data_{}_Iso'.format(qRC.EBEE), 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.028 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0', options.split)
-        
+def main(args):
+    sourceDir = args.sourceDir
+    outDir = args.outDir
+    year = args.year
+    EBEE = args.EBEE
+    split = args.split
+
+    qRC = QReg_C(year, EBEE, outDir, ['probeR9'])
+
+    qRC.loadROOT(
+            '{}/outputMC.root'.format(sourceDir),
+            'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All',
+            'df_mc_{}'.format(qRC.EBEE),
+            'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeChIso03<6 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
+            split
+            )
+    qRC.loadROOT(
+            '{}/outputData.root'.format(sourceDir),
+            'tagAndProbeDumper/trees/Data_13TeV_All',
+            'df_data_{}'.format(qRC.EBEE),
+            'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeChIso03<6 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
+            split
+            )
+
+    if EBEE == 'EB':
+        qRC.loadROOT(
+                '{}/outputMC.root'.format(sourceDir),
+                'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All',
+                'df_mc_{}_Iso'.format(qRC.EBEE),
+                'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.0105 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
+                split
+                )
+        qRC.loadROOT(
+                '{}/outputData.root'.format(sourceDir),
+                'tagAndProbeDumper/trees/Data_13TeV_All',
+                'df_data_{}_Iso'.format(qRC.EBEE),
+                'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.0105 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
+                split
+                )
+    elif EBEE == 'EE':
+        qRC.loadROOT(
+                '{}/outputMC.root'.format(sourceDir),
+                'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All',
+                'df_mc_{}_Iso'.format(qRC.EBEE),
+                'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.028 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
+                split
+                )
+        qRC.loadROOT(
+                '{}/outputData.root'.format(sourceDir),
+                'tagAndProbeDumper/trees/Data_13TeV_All',
+                'df_data_{}_Iso'.format(qRC.EBEE),
+                'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.028 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
+                split
+                )
+
+
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser()
-    requiredArgs = parser.add_argument_group('Required Arguements')
-    requiredArgs.add_argument('-D','--sourceDir', action='store', required=True)
-    requiredArgs.add_argument('-O','--outDir', action='store', required=True)
-    requiredArgs.add_argument('-y','--year', action='store', required=True)
-    requiredArgs.add_argument('-E','--EBEE', action='store', required=True)
-    requiredArgs.add_argument('-s','--split', action='store', type=float, required=True)
-    # optionalArgs = parser.add_argument_group('Optional Arguements')
-    # optionalArgs.add_argument('-l', '--label', action='store', default='')
-    options=parser.parse_args()
-    main(options)
+    args = parse_arguments()
+    main(args)
