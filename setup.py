@@ -22,7 +22,7 @@ setup(
         'numpy',
         'sklearn',
         'pandas',
-        'root_pandas',
+        'uproot4',
         'xgboost',
         'joblib',
         ]
