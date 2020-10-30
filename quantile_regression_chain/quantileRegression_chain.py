@@ -10,7 +10,8 @@ import os
 import ROOT as rt
 import uproot4
 
-from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
+from dask.distributed import Client, LocalCluster, progress
+from dask_jobqueue import SLURMCluster
 
 from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
 from .tmva.eleIdMVAComputer import eleIdMvaComputer, helpComputeEleIdMva
@@ -264,19 +265,22 @@ class quantileRegression_chain(object):
 
         logger.info('Training quantile regression on {} for {} with features {}'.format(key,var,features))
 
-        with parallel_backend(self.backend):
-            Parallel(n_jobs=len(self.quantiles),verbose=20)(
-                    delayed(trainClf)(
-                        q,
-                        maxDepth,
-                        minLeaf,
-                        X,
-                        Y,
-                        save = True,
-                        outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
-                        name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(q).replace('.','p')),
-                        X_names = features,Y_name=var) for q in self.quantiles)
+        futures = [self.client.submit(
+            trainClf,
+            quantile,
+            maxDepth,
+            minLeaf,
+            X,
+            Y,
+            save = True,
+            outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
+            name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(q).replace('.','p')),
+            X_names = features,
+            Y_name=var) for quantile in self.quantiles
+            ]
 
+        progress(futures)
+        trained_regressors = self.client.gather(futures)
 
     def correctY(self, var, n_jobs=1, diz=False):
         """
@@ -307,8 +311,16 @@ class quantileRegression_chain(object):
         Y = Y.values.reshape(-1,1)
         Z = np.hstack([X,Y])
 
-        with parallel_backend(self.backend):
-            Ycorr = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(applyCorrection)(self.clfs_mc,self.clfs_d,ch[:,:-1],ch[:,-1],diz=diz) for ch in np.array_split(Z,n_jobs) ) )
+        futures = [self.client.submit(
+            applyCorrection,
+            self.clfs_mc,
+            self.clfs_d,
+            ch[:,:-1],
+            ch[:,-1],
+            diz=diz) for ch in np.array_split(Z, self.n_jobs)]
+
+        progress(futures)
+        Ycorr = self.client.gather(futures)
 
         self.MC['{}_corr'.format(var_raw)] = Ycorr
 
@@ -414,7 +426,7 @@ class quantileRegression_chain(object):
             X = self.MC.loc[:,features].values
             self.MC['{}_corr_1Reg'.format(var)] = self.MC[var] + self.scaler.inverse_transform(self.finalReg.predict(X).reshape(-1,1)).ravel()
 
-    def trainAllMC(self,weightsDir,n_jobs=1):
+    def trainAllMC(self,weightsDir):
         """
         Method to train all BDTs for MC. Multiple BDTs per variable are trained and applied, such that the
         BDTs for the next variable can be trained with the other corrected variables as inputs.
@@ -433,7 +445,7 @@ class quantileRegression_chain(object):
                 self.trainOnMC(var,weightsDir=weightsDir)
                 self.loadClfs(var,weightsDir)
 
-            self.correctY(var,n_jobs=n_jobs)
+            self.correctY(var)
 
     def loadClfs(self, var, weightsDir):
         """
@@ -628,25 +640,45 @@ class quantileRegression_chain(object):
                 Y = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(helpComputeEleIdMva)(weightsEB1,weightsEB2,weightsEE,correctedVariables,self.data[ch:ch+stride],tpC, leg2016) for ch in range(0,self.data.index.size,stride)))
             self.data[name] = Y
 
+    def setup_cluster(self, config_file = None):
+        """ Setup cluster to distribute the computation of the regressors.
+        If config_file is None, a local cluster is setup (i.e., we run locally).
+        If config_file is a yaml file in the form:
+        (...)
+        jobqueue:
+          slurm:
+            cores: 72
+            memory: 100GB
+            jobs: 100
+            (...)
+        (...)
+        a SLURM cluster is setup with the information passed.
+        See https://jobqueue.dask.org/en/latest/generated/dask_jobqueue.SLURMCluster.html#dask_jobqueue.SLURMCluster
+        for more.
 
-    def setupJoblib(self,ipp_profile='default',cluster_id=None):
+        Args:
+            config_file (str): name of the configuration file to setup the SLURM cluster
         """
-        Method to set ipyparallel backend to a running ipcluster
-        Arguments
-        ---------
-        ipp_profile : string
-            Name of ipcluster profile for the started ipcluster that will be set up
-        """
+        if config_file:
+            if not isinstance(config_file, str):
+                raise TypeError('if passed, config_file must be of type string')
 
-        import ipyparallel as ipp
-        from ipyparallel.joblib import IPythonParallelBackend
-        global joblib_rc,joblib_view,joblib_be
-        joblib_rc = ipp.Client(profile=ipp_profile, cluster_id=cluster_id)
-        joblib_view = joblib_rc.load_balanced_view()
-        joblib_be = IPythonParallelBackend(view=joblib_view)
-        register_parallel_backend('ipyparallel',lambda: joblib_be, make_default=True)
+            stream = open(config_file, 'r')
+            inp = yaml.load(stream)
+            cores = inp['jobqueue']['slurm']['cores']
+            memory = inp['jobqueue']['slurm']['memory']
+            self.n_jobs = inp['jobqueue']['slurm']['jobs']
+            self.cluster = SLURMCluster(
+                    cores = cores,
+                    memory = memory,
+                    )
+            self.cluster.scale(jobs = self.n_jobs)
+        else:
+            self.cluster = LocalCluster()
+            self.n_jobs = 1
 
-        self.backend = 'ipyparallel'
+        self.client = Client(self.cluster)
+        logger.info('Settin up Client {}'.format(self.client))
 
 
 def trainClf(alpha,maxDepth,minLeaf,X,Y,save=False,outDir=None,name=None,X_names=None,Y_name=None):
