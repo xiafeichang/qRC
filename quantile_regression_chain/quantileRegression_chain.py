@@ -268,19 +268,22 @@ class quantileRegression_chain(object):
 
         logger.info('Training quantile regression on {} for {} with features {}'.format(key,var,features))
 
-        with parallel_backend(self.backend):
-            Parallel(n_jobs=len(self.quantiles),verbose=20)(
-                    delayed(trainClf)(
-                        q,
-                        maxDepth,
-                        minLeaf,
-                        X,
-                        Y,
-                        save = True,
-                        outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
-                        name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(q).replace('.','p')),
-                        X_names = features,Y_name=var) for q in self.quantiles)
+        futures = [self.client.submit(
+            trainClf,
+            quantile,
+            maxDepth,
+            minLeaf,
+            X,
+            Y,
+            save = True,
+            outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
+            name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(quantile).replace('.','p')),
+            X_names = features,
+            Y_name=var) for quantile in self.quantiles
+            ]
 
+        progress(futures)
+        trained_regressors = self.client.gather(futures)
 
     def correctY(self, var, n_jobs=1, diz=False):
         """
