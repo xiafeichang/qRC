@@ -19,6 +19,8 @@ from .tmva.eleIdMVAComputer import eleIdMvaComputer, helpComputeEleIdMva
 from .Corrector import Corrector, applyCorrection
 #from sklearn.externals.joblib import Parallel, parallel_backend, register_parallel_backend
 
+from itertools import product
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -207,12 +209,12 @@ class quantileRegression_chain(object):
         logger.info('Loading data Dataframe from: {}/{}'.format(self.workDir,h5name))
         self.data = self._loadDF(h5name,start,stop,rndm,rsh,columns)
 
-    def trainOnData(self,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
+    def trainOnData(self,variables,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
         """
         Method to train quantile regression BDTs on data. See ``_trainQuantiles`` for Arguments
         """
 
-        self._trainQuantiles('data',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
+        self._trainQuantiles('data', variables,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
 
     def trainOnMC(self,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
         """
@@ -221,7 +223,7 @@ class quantileRegression_chain(object):
 
         self._trainQuantiles('mc',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
 
-    def _trainQuantiles(self,key,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
+    def _trainQuantiles(self,key,variables,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
         """
         Internal method to train BDTs for quantile morphing. All trees for one variable are trained in parallel.
         An ipcluster can be used a ipyparallel backend. Call ``register_parallel_backend`` to set this up.
@@ -241,47 +243,49 @@ class quantileRegression_chain(object):
             Directory the weight files will be saved to. Relative to ``workDir``
         """
 
-        if var not in self.vars+['{}_shift'.format(x) for x in self.vars]:
-            raise ValueError('{} has to be one of {}'.format(var, self.vars))
+        for var in variables:
+            if var not in self.vars+['{}_shift'.format(x) for x in self.vars]:
+                raise ValueError('{} has to be one of {}'.format(var, self.vars))
 
-        if key.startswith('mc'):
-            features = self.kinrho + ['{}_corr'.format(x) for x in self.vars[:self.vars.index(var)]]
-            if 'diz' in key:
-                X = self.MC.loc[self.MC[var]!=0,features]
-                Y = self.MC.loc[self.MC[var]!=0,var]
-            else:
-                X = self.MC.loc[:,features]
-                Y = self.MC.loc[:,var]
+        def get_tpl(var):
+            """ Helper method to use below: it returns a tuple (features, X, Y)
+            depending on the variable passed as input
+            """
+            if key.startswith('mc'):
+                features = self.kinrho + ['{}_corr'.format(x) for x in self.vars[:self.vars.index(var)]]
+                if 'diz' in key:
+                    return features, self.MC.loc[self.MC[var]!=0,features], self.MC.loc[self.MC[var]!=0,var]
+                else:
+                    return features, self.MC.loc[:,features], self.MC.loc[:,var]
 
-        elif key.startswith('data'):
-            features = self.kinrho + self.vars[:self.vars.index(var)]
-            if 'diz' in key:
-                X = self.data.loc[self.data[var]!=0,features]
-                Y = self.data.loc[self.data[var]!=0,var]
+            elif key.startswith('data'):
+                features = self.kinrho + self.vars[:self.vars.index(var)]
+                if 'diz' in key:
+                    return features, self.data.loc[self.data[var]!=0,features], self.data.loc[self.data[var]!=0,var]
+                else:
+                    return features, self.data.loc[:,features], self.data.loc[:,var]
             else:
-                X = self.data.loc[:,features]
-                Y = self.data.loc[:,var]
-        else:
-            raise KeyError('Key needs to specify if data or mc')
+                raise KeyError('Key needs to specify if data or mc')
 
         name_key = 'data' if 'data' in key else 'mc'
 
-        logger.info('Training quantile regression on {} for {} with features {}'.format(key,var,features))
-
-        futures = [self.client.submit(
-            trainClf,
-            quantile,
-            maxDepth,
-            minLeaf,
-            X,
-            Y,
-            save = True,
-            outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
-            name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(quantile).replace('.','p')),
-            X_names = features,
-            Y_name=var) for quantile in self.quantiles
-            ]
-
+        futures = []
+        for quantile, var in product(self.quantiles, variables):
+            features, X, Y = get_tpl(var)
+            logger.debug('Training quantile regression on {} for {} with features {}'.format(key,var,features))
+            future = self.client.submit(
+                trainClf,
+                quantile,
+                maxDepth,
+                minLeaf,
+                X,
+                Y,
+                save = True,
+                outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
+                name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(quantile).replace('.','p')),
+                X_names = features,
+                Y_name = var)
+            futures.append(future)
         progress(futures)
         trained_regressors = self.client.gather(futures)
 
