@@ -11,6 +11,8 @@ import ROOT as rt
 import uproot4
 
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
+from dask.distributed import Client, LocalCluster, progress
+from dask_jobqueue import SLURMCluster
 
 from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
 from .tmva.eleIdMVAComputer import eleIdMvaComputer, helpComputeEleIdMva
@@ -34,7 +36,7 @@ class quantileRegression_chain(object):
     :type varrs: list
     """
 
-    def __init__(self,year,EBEE,workDir,varrs):
+    def __init__(self,year,EBEE,workDir,varrs, cluster_config_file = None):
 
         self.year = year
         self.workDir = os.path.abspath(workDir)
@@ -60,6 +62,8 @@ class quantileRegression_chain(object):
         self.etamax =  2.5
         self.phimin = -3.14
         self.phimax =  3.14
+
+        self._setup_cluster(cluster_config_file)
 
     def loadROOT(self,path,tree,outname,cut=None,split=None,rndm=12345):
         """
@@ -648,6 +652,44 @@ class quantileRegression_chain(object):
 
         self.backend = 'ipyparallel'
 
+    def _setup_cluster(self, config_file = None):
+        """ Setup cluster to distribute the computation of the regressors.
+        If config_file is None, a local cluster is setup (i.e., we run locally).
+        If config_file is a yaml file in the form:
+        (...)
+        jobqueue:
+          slurm:
+            cores: 72
+            memory: 100GB
+            jobs: 100
+            (...)
+        (...)
+        a SLURM cluster is setup with the information passed.
+        See https://jobqueue.dask.org/en/latest/generated/dask_jobqueue.SLURMCluster.html#dask_jobqueue.SLURMCluster
+        for more.
+        Args:
+            config_file (str): name of the configuration file to setup the SLURM cluster
+        """
+        if config_file:
+            if not isinstance(config_file, str):
+                raise TypeError('if passed, config_file must be of type string')
+
+            stream = open(config_file, 'r')
+            inp = yaml.load(stream)
+            cores = inp['jobqueue']['slurm']['cores']
+            memory = inp['jobqueue']['slurm']['memory']
+            jobs = inp['jobqueue']['slurm']['jobs']
+            self.cluster = SLURMCluster(
+                    cores = cores,
+                    memory = memory,
+                    )
+            self.cluster.scale(jobs = jobs)
+        else:
+            self.cluster = LocalCluster()
+
+        self.client = Client(self.cluster)
+        logger.info('Setting up {}'.format(self.cluster))
+        logger.info('Setting up Client {}'.format(self.client))
 
 def trainClf(alpha,maxDepth,minLeaf,X,Y,save=False,outDir=None,name=None,X_names=None,Y_name=None):
     """
