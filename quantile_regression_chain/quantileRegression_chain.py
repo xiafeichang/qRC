@@ -212,7 +212,7 @@ class quantileRegression_chain(object):
         Method to train quantile regression BDTs on data. See ``_trainQuantiles`` for Arguments
         """
 
-        self._trainQuantiles('data',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
+        return self._trainQuantiles('data',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
 
     def trainOnMC(self,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
         """
@@ -282,8 +282,7 @@ class quantileRegression_chain(object):
             Y_name=var) for quantile in self.quantiles
             ]
 
-        progress(futures)
-        trained_regressors = self.client.gather(futures)
+        return futures
 
     def correctY(self, var, n_jobs=1, diz=False):
         """
@@ -420,6 +419,16 @@ class quantileRegression_chain(object):
         else:
             X = self.MC.loc[:,features].values
             self.MC['{}_corr_1Reg'.format(var)] = self.MC[var] + self.scaler.inverse_transform(self.finalReg.predict(X).reshape(-1,1)).ravel()
+
+    def trainAllData(self, variables, weightsDir):
+        futures = []
+        for var in variables:
+            v_futures = self.trainOnData(var, weightsDir = weightsDir)
+            for v_future in v_futures:
+                futures.append(v_future)
+        progress(futures)
+        trained_regressors = self.client.gather(futures)
+
 
     def trainAllMC(self,weightsDir,n_jobs=1):
         """
