@@ -313,15 +313,16 @@ class quantileRegression_chain(object):
         Y = Y.values.reshape(-1,1)
         Z = np.hstack([X,Y])
 
-        futures = [self.client.submit(
-            applyCorrection,
-            self.clfs_mc,
-            self.clfs_d,
-            ch[:,:-1],
-            ch[:,-1],
-            diz=diz) for ch in np.array_split(Z, n_jobs)]
-
-        return futures, var_raw
+        future = self.client.submit(
+                applyCorrection,
+                self.clfs_mc,
+                self.clfs_d,
+                Z[:,:-1],
+                Z[:,-1],
+                diz=diz)
+        progress(future)
+        Ycorr = self.client.gather(future)
+        self.MC['{}_corr'.format(var_raw)] = Ycorr
 
 
     def trainFinalRegression(self,var,weightsDir,diz=False,n_jobs=1):
@@ -457,12 +458,7 @@ class quantileRegression_chain(object):
                 trained_regressors = self.client.gather(futures)
                 self.loadClfs(var,weightsDir)
 
-            futures, var_raw = self.correctY(var,n_jobs=n_jobs)
-            progress(futures)
-            slices = self.client.gather(futures)
-
-            Ycorr = np.concatenate(slices)
-            self.MC['{}_corr'.format(var_raw)] = Ycorr
+            self.correctY(var,n_jobs=n_jobs)
 
 
     def loadClfs(self, var, weightsDir):
