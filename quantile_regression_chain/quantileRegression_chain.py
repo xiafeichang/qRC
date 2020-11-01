@@ -219,7 +219,7 @@ class quantileRegression_chain(object):
         Method to train quantile regression BDTs on MC. See ``_trainQuantiles`` for Arguments
         """
 
-        self._trainQuantiles('mc',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
+        return self._trainQuantiles('mc',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
 
     def _trainQuantiles(self,key,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
         """
@@ -313,10 +313,16 @@ class quantileRegression_chain(object):
         Y = Y.values.reshape(-1,1)
         Z = np.hstack([X,Y])
 
-        with parallel_backend(self.backend):
-            Ycorr = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(applyCorrection)(self.clfs_mc,self.clfs_d,ch[:,:-1],ch[:,-1],diz=diz) for ch in np.array_split(Z,n_jobs) ) )
+        futures = [self.client.submit(
+            applyCorrection,
+            self.clfs_mc,
+            self.clfs_d,
+            ch[:,:-1],
+            ch[:,-1],
+            diz=diz) for ch in np.array_split(Z, n_jobs)]
 
-        self.MC['{}_corr'.format(var_raw)] = Ycorr
+        return futures, var_raw
+
 
     def trainFinalRegression(self,var,weightsDir,diz=False,n_jobs=1):
         """
@@ -446,10 +452,18 @@ class quantileRegression_chain(object):
             try:
                 self.loadClfs(var,weightsDir)
             except IOError:
-                self.trainOnMC(var,weightsDir=weightsDir)
+                futures = self.trainOnMC(var,weightsDir=weightsDir)
+                progress(futures)
+                trained_regressors = self.client.gather(futures)
                 self.loadClfs(var,weightsDir)
 
-            self.correctY(var,n_jobs=n_jobs)
+            futures, var_raw = self.correctY(var,n_jobs=n_jobs)
+            progress(futures)
+            slices = self.client.gather(futures)
+
+            Ycorr = np.concatenate(slices)
+            self.MC['{}_corr'.format(var_raw)] = Ycorr
+
 
     def loadClfs(self, var, weightsDir):
         """
