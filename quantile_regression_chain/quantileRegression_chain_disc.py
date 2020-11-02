@@ -7,6 +7,8 @@ import pandas as pd
 import pickle as pkl
 
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
+from dask.distributed import Client, LocalCluster, progress
+from dask_jobqueue import SLURMCluster
 
 from sklearn.ensemble import GradientBoostingRegressor
 from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
@@ -33,17 +35,19 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
         features = self.kinrho
 
-        df['p0t_{}'.format(var)] = np.apply_along_axis(lambda x: 0 if x==0 else 1,0,df[var].reshape(1,-1))
+        weightsDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir, weightsDir)
+
+        df['p0t_{}'.format(var)] = np.apply_along_axis(lambda x: 0 if x==0 else 1,0,df[var].values.reshape(1,-1))
         X = df.loc[:,features].values
         Y = df['p0t_{}'.format(var)].values
         clf = xgb.XGBClassifier(n_estimators=300,learning_rate=0.05,maxDepth=10,subsample=0.5,gamma=0, n_jobs=n_jobs)
-        with parallel_backend(self.backend):
-            clf.fit(X,Y)
+        future = self.client.submit(clf.fit, X, Y)
+        progress(future)
 
         X_names = features
         Y_name = var
         dic = {'clf': clf, 'X': X_names, 'Y': Y_name}
-        pkl.dump(dic,gzip.open('{}/{}/{}_clf_p0t_{}_{}.pkl'.format(self.workDir,weightsDir,key,self.EBEE,var),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
+        pkl.dump(dic,gzip.open('{}/{}_clf_p0t_{}_{}.pkl'.format(weightsDir,key,self.EBEE,var),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
 
     def train3Catclf(self,varrs,key,weightsDir='weights_qRC',n_jobs=1):
 
@@ -56,17 +60,19 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
         features = self.kinrho
 
+        weightsDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir, weightsDir)
+
         df['ChIsoCat'] = self.get_class_3Cat(df[varrs[0]].values,df[varrs[1]].values)
         X = df.loc[:,features].values
         Y = df['ChIsoCat'].values
         clf = xgb.XGBClassifier(n_estimators=500, learning_rate=0.05, maxDepth=10,gamma=0, n_jobs=n_jobs)
-        with parallel_backend(self.backend):
-            clf.fit(X,Y)
+        future = self.client.submit(clf.fit, X, Y)
+        progress(future)
 
         X_names = features
         Y_names = [varrs[0],varrs[1]]
         dic = {'clf': clf, 'X': X_names, 'Y': Y_names}
-        pkl.dump(dic,gzip.open('{}/{}/{}_clf_3Cat_{}_{}_{}.pkl'.format(self.workDir,weightsDir,key,self.EBEE,varrs[0],varrs[1]),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
+        pkl.dump(dic,gzip.open('{}/{}_clf_3Cat_{}_{}_{}.pkl'.format(weightsDir,key,self.EBEE,varrs[0],varrs[1]),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
 
     def get_class_3Cat(self,x,y):
         return [0 if x[i]==0 and y[i]==0 else (1 if x[i]==0 and y[i]>0 else 2) for i in range(len(x))]
@@ -162,7 +168,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
     def trainOnData(self,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
 
         logger.info('Training quantile regressors on data')
-        self._trainQuantiles('data_diz',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
+        return self._trainQuantiles('data_diz',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
 
     def trainOnMC(self,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
 
