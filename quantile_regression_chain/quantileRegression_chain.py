@@ -364,7 +364,7 @@ class quantileRegression_chain(object):
         Y = df[target].values
 
         try:
-            settings = yaml.load(open('{}/finalRegression_settings.yaml'.format(weightsDir)))
+            settings = yaml.safe_load(open('{}/finalRegression_settings.yaml'.format(weightsDir)))
             clf = xgb.XGBRegressor(base_score=0.,n_jobs=n_jobs,**settings[var])
             logger.info('Custom settings loaded')
         except (IOError,KeyError):
@@ -697,7 +697,7 @@ class quantileRegression_chain(object):
                 raise TypeError('if passed, config_file must be of type string')
 
             stream = open(config_file, 'r')
-            inp = yaml.load(stream)
+            inp = yaml.safe_load(stream)
             cores = inp['jobqueue']['slurm']['cores']
             memory = inp['jobqueue']['slurm']['memory']
             jobs = inp['jobqueue']['slurm']['jobs']
