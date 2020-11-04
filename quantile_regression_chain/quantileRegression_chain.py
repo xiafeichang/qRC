@@ -458,6 +458,7 @@ class quantileRegression_chain(object):
                 trained_regressors = self.client.gather(futures)
                 self.loadClfs(var,weightsDir)
 
+            logger.debug('Correcting Y for var {}'.format(var))
             self.correctY(var,n_jobs=n_jobs)
 
 
