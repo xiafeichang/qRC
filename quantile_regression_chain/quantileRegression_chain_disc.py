@@ -217,6 +217,26 @@ class quantileRegression_chain_disc(quantileRegression_chain):
     def trainOnMC(self,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
         return self._trainQuantiles('mc_diz',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
 
+    def trainAllData(self, weightsDir):
+        trained_regressors = super().trainAllData(weightsDir)
+        if 'probeChIso03' in self.vars:
+            if not os.path.exists('{}/{}/data_clf_3cat_{}_{}_{}.pkl'.format(
+            self.workDir, weightsDir, self.EBEE, 'probeChIso03', 'probeChIso03worst')):
+                logger.info('Applying train3Catclf')
+                trained_regressors.append(self.train3Catclf(
+                        ['probeChIso03', 'probeChIso03worst'],
+                        'data',
+                        weightsDir=weightsDir
+                        ))
+        if 'probePhoIso' in self.vars:
+            if not os.path.exists('{}/{}/data_clf_p0t_{}_{}.pkl'.format(
+                self.workDir, weightsDir, self.EBEE, 'probePhoIso')):
+                logger.info('Applying trainp0tclf')
+                trained_regressors.append(self.trainp0tclf(
+                        'probePhoIso',
+                        'data',
+                        weightsDir=weightsDir))
+        return trained_regressors
 
     def trainAllMC(self,weightsDir):
 

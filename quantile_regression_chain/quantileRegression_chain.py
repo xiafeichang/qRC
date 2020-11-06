@@ -728,12 +728,12 @@ class quantileRegression_chain(object):
         else:
             self.cluster = LocalCluster()
 
-    def setup_client(cluster = None):
-        logger.info('Setting up Client {}'.format(self.client))
+    def setup_client(self, cluster = None):
         if cluster is None:
             self.client = Client(self.cluster)
         else:
             self.client = Client(cluster)
+        logger.info('Setting up Client {}'.format(self.client))
 
 
 def trainClf(alpha,maxDepth,minLeaf,X,Y,save=False,outDir=None,name=None,X_names=None,Y_name=None):
