@@ -7,7 +7,7 @@ import pandas as pd
 import pickle as pkl
 
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
-from dask.distributed import Client, LocalCluster, progress
+from dask.distributed import Client, LocalCluster, progress, wait, get_client
 from dask_jobqueue import SLURMCluster
 
 from sklearn.ensemble import GradientBoostingRegressor
@@ -127,26 +127,30 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
         logger.info('Shifting {} with input features {}'.format(var,features))
 
+        n_workers = len(get_client().scheduler_info()['workers'])
+
         if finalReg:
-            future = self.client.submit(applyShift,
+            future_splits = [self.client.submit(applyShift,
                     self.p0tclf_mc,
                     self.p0tclf_d,
                     [self.finalTailRegs[var]],
-                    Z[:,:-1],
-                    Z[:,-1])
-            progress(future)
-            Y_shift = self.client.gather(future)
+                    ch[:,:-1],
+                    ch[:,-1]) for ch in np.array_split(Z, n_workers)]
+            progress(future_splits)
+            Y_shift = np.concatenate(self.client.gather(future_splits))
             self.MC['{}_shift_final'.format(var)] = Y_shift
+            del future_splits
         else:
-            future = self.client.submit(applyShift,
+            future_splits = [self.client.submit(applyShift,
                     self.p0tclf_mc,
                     self.p0tclf_d,
                     self.clfs_mc,
-                    Z[:,:-1],
-                    Z[:,-1])
-            progress(future)
-            Y_shift = self.client.gather(future)
+                    ch[:,:-1],
+                    ch[:,-1]) for ch in np.array_split(Z, n_workers)]
+            progress(future_splits)
+            Y_shift = np.concatenate(self.client.gather(future_splits))
             self.MC['{}_shift'.format(var)] = Y_shift
+            del future_splits
 
 
     def shiftY2D(self,varrs,finalReg=False,n_jobs=1):
@@ -161,39 +165,41 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         Y = Y.values.reshape(-1,2)
         Z = np.hstack([X,Y])
 
+        n_workers = len(get_client().scheduler_info()['workers'])
+
         if finalReg:
-            future = self.client.submit(apply2DShift,
+            future_splits = [self.client.submit(apply2DShift,
                     self.TCatclf_mc,
                     self.TCatclf_d,
                     [self.finalTailRegs[varrs[0]]],
                     [self.finalTailRegs[varrs[1]]],
-                    Z[:,:-2],
-                    Z[:,-2:])
-            progress(future)
-            Y_shift = self.client.gather(future)
+                    ch[:,:-2],
+                    ch[:,-2:]) for ch in np.array_split(Z, n_workers)]
+            progress(future_splits)
+            Y_shift = np.concatenate(self.client.gather(future_splits))
             self.MC['{}_shift_final'.format(varrs[0])] = Y_shift[:,0]
             self.MC['{}_shift_final'.format(varrs[1])] = Y_shift[:,1]
         else:
-            future = self.client.submit(apply2DShift,
+            future_splits = [self.client.submit(apply2DShift,
                     self.TCatclf_mc,
                     self.TCatclf_d,
                     self.tail_clfs_mc[varrs[0]],
                     self.tail_clfs_mc[varrs[1]],
-                    Z[:,:-2],
-                    Z[:,-2:])
-            progress(future)
-            Y_shift = self.client.gather(future)
+                    ch[:,:-2],
+                    ch[:,-2:]) for ch in np.array_split(Z, n_workers)]
+            progress(future_splits)
+            Y_shift = np.concatenate(self.client.gather(future_splits))
             self.MC['{}_shift'.format(varrs[0])] = Y_shift[:,0]
             self.MC['{}_shift'.format(varrs[1])] = Y_shift[:,1]
 
 
-    def correctY(self,var,n_jobs=1):
+    def correctY(self, var):
 
         if len(self.vars)==1:
-            self.shiftY(var,n_jobs=n_jobs)
+            self.shiftY(var)
         elif len(self.vars)>1 and '{}_shift'.format(var) not in self.MC.columns:
-            self.shiftY2D(self.vars,n_jobs=n_jobs)
-        super(quantileRegression_chain_disc, self).correctY('{}_shift'.format(var), n_jobs=n_jobs, diz=True)
+            self.shiftY2D(self.vars)
+        super(quantileRegression_chain_disc, self).correctY('{}_shift'.format(var), diz=True)
 
     def applyFinalRegression(self,var,n_jobs=1):
 
@@ -209,33 +215,24 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         return self._trainQuantiles('data_diz',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
 
     def trainOnMC(self,var,maxDepth=5,minLeaf=500,weightsDir='/weights_qRC'):
-
-        logger.info('Training quantile regressors on MC')
         return self._trainQuantiles('mc_diz',var=var,maxDepth=maxDepth,minLeaf=minLeaf,weightsDir=weightsDir)
 
-    def trainAllData(self, variables, weightsDir):
-        futures = []
-        for var in variables:
-            v_futures = self.trainOnData(var, weightsDir = weightsDir)
-            for v_future in v_futures:
-                futures.append(v_future)
-        logger.info('Waiting for trained regressors for variables {}'.format(
-            variables))
-        progress(futures)
-        trained_regressors = self.client.gather(futures)
 
+    def trainAllMC(self,weightsDir):
 
-    def trainAllMC(self,weightsDir,n_jobs=1):
-
+        # Train tail regressors
         try:
             self.loadTailRegressors(self.vars,weightsDir)
         except IOError:
             futures = [future for var in self.vars for future in self.trainTailRegressors(
                 var, weightsDir)]
+
             logger.info('Waiting for MC trained tail regressors for vars {}'.format(
                 self.vars))
             progress(futures)
-            tail_regressors = self.client.gather(futures)
+            wait(futures)
+            del futures
+
             self.loadTailRegressors(self.vars,weightsDir)
 
         for var in self.vars:
@@ -243,9 +240,12 @@ class quantileRegression_chain_disc(quantileRegression_chain):
                 self.loadClfs(var,weightsDir)
             except IOError:
                 futures = self.trainOnMC(var,weightsDir=weightsDir)
-                progress(futures)
+
                 logger.info('Waiting for MC trained regressors for {}'.format(var))
-                trained_regressors = self.client.gather(futures)
+                progress(futures)
+                wait(futures)
+                del futures
+
                 self.loadClfs(var,weightsDir)
 
             try:
@@ -262,7 +262,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
                     self.loadp0tclf(var,weightsDir)
 
                 logger.info('Correcting variable {}'.format(var))
-                self.correctY(var,n_jobs=n_jobs)
+                self.correctY(var)
 
     def trainFinalRegression(self,var,weightsDir,n_jobs=1):
         super(quantileRegression_chain_disc,self).trainFinalRegression(var,weightsDir,diz=True,n_jobs=n_jobs)

@@ -11,7 +11,7 @@ import ROOT as rt
 import uproot4
 
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
-from dask.distributed import Client, LocalCluster, progress
+from dask.distributed import Client, LocalCluster, progress, wait, get_client
 from dask_jobqueue import SLURMCluster
 
 from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
@@ -63,7 +63,6 @@ class quantileRegression_chain(object):
         self.phimin = -3.14
         self.phimax =  3.14
 
-        self._setup_cluster(cluster_config_file)
 
     def loadROOT(self,path,tree,outname,cut=None,split=None,rndm=12345):
         """
@@ -284,18 +283,17 @@ class quantileRegression_chain(object):
 
         return futures
 
-    def correctY(self, var, n_jobs=1, diz=False):
+    def correctY(self, var, diz=False):
         """
         Medthod to apply correction for  one variable in MC. BDTs for data and MC have to be loaded first,
         using ``loadClfs``.
-        Make sure to load the right files, variable names are not checked. If ``n_jobs`` is bigger than 1,
-        correction will be run in parallel, with ipcluster backend if available, otherwise loky
+        Make sure to load the right files, variable names are not checked.
+        Correction will be run in parallel with Dask, splitting the dataframe in n_workers
+        slices
         Arguments
         ---------
         var : string
             Name of varible to be corrected
-        n_jobs : int, default 1
-            Number of parallel processes to use
         diz : bool, defautl ``False``
             Specify if variable to be corrected is discontinuous. Only for ``quantileRegression_chain_disc``
         """
@@ -313,16 +311,19 @@ class quantileRegression_chain(object):
         Y = Y.values.reshape(-1,1)
         Z = np.hstack([X,Y])
 
-        future = self.client.submit(
+        n_workers = len(get_client().scheduler_info()['workers'])
+
+        future_splits = [self.client.submit(
                 applyCorrection,
                 self.clfs_mc,
                 self.clfs_d,
-                Z[:,:-1],
-                Z[:,-1],
-                diz=diz)
-        progress(future)
-        Ycorr = self.client.gather(future)
+                ch[:,:-1],
+                ch[:,-1],
+                diz=diz) for ch in np.array_split(Z, n_workers)]
+        progress(future_splits)
+        Ycorr = np.concatenate(self.client.gather(future_splits))
         self.MC['{}_corr'.format(var_raw)] = Ycorr
+        del future_splits
 
 
     def trainFinalRegression(self,var,weightsDir,diz=False,n_jobs=1):
@@ -427,17 +428,33 @@ class quantileRegression_chain(object):
             X = self.MC.loc[:,features].values
             self.MC['{}_corr_1Reg'.format(var)] = self.MC[var] + self.scaler.inverse_transform(self.finalReg.predict(X).reshape(-1,1)).ravel()
 
-    def trainAllData(self, variables, weightsDir):
+    def trainAllData(self, weightsDir):
+        """
+        Method to train all BDTs for Data. Since the variables for data can be trained
+        independently the idea is to use the Dask machinery to submit the training
+        functions for each quantile for each variable and gather the results all at once
+        Arguments
+        ---------
+        weightsDir : string
+            Directory where the weight files will be stored. Data weights have to be in there.
+        """
         futures = []
-        for var in variables:
+
+        for var in self.vars:
             v_futures = self.trainOnData(var, weightsDir = weightsDir)
             for v_future in v_futures:
                 futures.append(v_future)
+
+        logger.info('Waiting for trained regressors for variables {}'.format(
+            self.vars))
+
         progress(futures)
-        trained_regressors = self.client.gather(futures)
+        wait(futures)
+
+        del futures
 
 
-    def trainAllMC(self,weightsDir,n_jobs=1):
+    def trainAllMC(self,weightsDir):
         """
         Method to train all BDTs for MC. Multiple BDTs per variable are trained and applied, such that the
         BDTs for the next variable can be trained with the other corrected variables as inputs.
@@ -445,8 +462,6 @@ class quantileRegression_chain(object):
         ---------
         weightsDir : string
             Directory where the weight files will be stored. Data weights have to be in there.
-        n_jobs: int
-            Number of jobs used for applying the previously trained BDTs. Uses ipcluster if set up.
         """
 
         for var in self.vars:
@@ -454,12 +469,15 @@ class quantileRegression_chain(object):
                 self.loadClfs(var,weightsDir)
             except IOError:
                 futures = self.trainOnMC(var,weightsDir=weightsDir)
+
                 progress(futures)
-                trained_regressors = self.client.gather(futures)
+                wait(futures)
+                del futures
+
                 self.loadClfs(var,weightsDir)
 
             logger.debug('Correcting Y for var {}'.format(var))
-            self.correctY(var,n_jobs=n_jobs)
+            self.correctY(var)
 
 
     def loadClfs(self, var, weightsDir):
@@ -675,7 +693,7 @@ class quantileRegression_chain(object):
 
         self.backend = 'ipyparallel'
 
-    def _setup_cluster(self, config_file = None):
+    def setup_cluster(self, config_file = None):
         """ Setup cluster to distribute the computation of the regressors.
         If config_file is None, a local cluster is setup (i.e., we run locally).
         If config_file is a yaml file in the form:
@@ -710,9 +728,13 @@ class quantileRegression_chain(object):
         else:
             self.cluster = LocalCluster()
 
-        self.client = Client(self.cluster)
-        logger.info('Setting up {}'.format(self.cluster))
+    def setup_client(cluster = None):
         logger.info('Setting up Client {}'.format(self.client))
+        if cluster is None:
+            self.client = Client(self.cluster)
+        else:
+            self.client = Client(cluster)
+
 
 def trainClf(alpha,maxDepth,minLeaf,X,Y,save=False,outDir=None,name=None,X_names=None,Y_name=None):
     """
