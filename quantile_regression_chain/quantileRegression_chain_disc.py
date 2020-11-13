@@ -32,6 +32,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
             raise KeyError('Please use data or mc')
 
         features = self.kinrho
+        weightsDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir, weightsDir)
 
         df['p0t_{}'.format(var)] = np.apply_along_axis(lambda x: 0 if x==0 else 1,0,df[var].reshape(1,-1))
         X = df.loc[:,features].values
@@ -43,7 +44,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         X_names = features
         Y_name = var
         dic = {'clf': clf, 'X': X_names, 'Y': Y_name}
-        pkl.dump(dic,gzip.open('{}/{}/{}_clf_p0t_{}_{}.pkl'.format(self.workDir,weightsDir,key,self.EBEE,var),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
+        pkl.dump(dic,gzip.open('{}/{}_clf_p0t_{}_{}.pkl'.format(weightsDir,key,self.EBEE,var),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
 
     def train3Catclf(self,varrs,key,weightsDir='weights_qRC',n_jobs=1):
 
@@ -55,6 +56,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
             raise KeyError('Please use data or mc')
 
         features = self.kinrho
+        weightsDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir, weightsDir)
 
         df['ChIsoCat'] = self.get_class_3Cat(df[varrs[0]].values,df[varrs[1]].values)
         X = df.loc[:,features].values
@@ -66,7 +68,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         X_names = features
         Y_names = [varrs[0],varrs[1]]
         dic = {'clf': clf, 'X': X_names, 'Y': Y_names}
-        pkl.dump(dic,gzip.open('{}/{}/{}_clf_3Cat_{}_{}_{}.pkl'.format(self.workDir,weightsDir,key,self.EBEE,varrs[0],varrs[1]),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
+        pkl.dump(dic,gzip.open('{}/{}_clf_3Cat_{}_{}_{}.pkl'.format(weightsDir,key,self.EBEE,varrs[0],varrs[1]),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
 
     def get_class_3Cat(self,x,y):
         return [0 if x[i]==0 and y[i]==0 else (1 if x[i]==0 and y[i]>0 else 2) for i in range(len(x))]
