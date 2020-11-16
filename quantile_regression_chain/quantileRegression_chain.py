@@ -432,7 +432,7 @@ class quantileRegression_chain(object):
         for var in self.vars:
             try:
                 self.loadClfs(var,weightsDir)
-            except IOError:
+            except:
                 self.trainOnMC(var,weightsDir=weightsDir)
                 self.loadClfs(var,weightsDir)
 

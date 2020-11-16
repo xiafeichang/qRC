@@ -175,7 +175,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
         try:
             self.loadTailRegressors(self.vars,weightsDir)
-        except IOError:
+        except:
             for var in self.vars:
                 self.trainTailRegressors(var,weightsDir)
             self.loadTailRegressors(self.vars,weightsDir)
@@ -183,7 +183,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         for var in self.vars:
             try:
                 self.loadClfs(var,weightsDir)
-            except IOError:
+            except:
                 self.trainOnMC(var,weightsDir=weightsDir)
                 self.loadClfs(var,weightsDir)
             try:
@@ -191,7 +191,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
                     self.load3Catclf(self.vars,weightsDir)
                 else:
                     self.loadp0tclf(var,weightsDir)
-            except IOError:
+            except:
                 if len(self.vars)>1:
                     self.train3Catclf(self.vars,key='mc',weightsDir=weightsDir)
                     self.load3Catclf(self.vars,weightsDir)
