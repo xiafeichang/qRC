@@ -52,3 +52,6 @@ docs/_build/
 # vim
 *.swp
 *.swo
+
+# Dask
+dask-worker-space/*

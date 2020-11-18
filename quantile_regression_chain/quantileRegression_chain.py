@@ -10,6 +10,8 @@ import os
 #import ROOT as rt
 import uproot4
 
+from dask.distributed import Client, LocalCluster, progress, wait
+
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
 
 from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
@@ -63,6 +65,8 @@ class quantileRegression_chain(object):
         self.etamax =  2.5
         self.phimin = -3.14
         self.phimax =  3.14
+
+        self.client = None
 
     def loadROOT(self,path,tree,outname,cut=None,split=None,rndm=12345):
         """
@@ -267,18 +271,39 @@ class quantileRegression_chain(object):
 
         logger.info('Training quantile regression on {} for {} with features {}'.format(key,var,features))
 
-        with parallel_backend(self.backend):
-            Parallel(n_jobs=len(self.quantiles),verbose=20)(
-                    delayed(trainClf)(
-                        q,
-                        maxDepth,
-                        minLeaf,
-                        X,
-                        Y,
-                        save = True,
-                        outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
-                        name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(q).replace('.','p')),
-                        X_names = features,Y_name=var) for q in self.quantiles)
+        if self.client:
+            logger.info('Found {}, submitting quantiles for {} variable {}'.format(self.client, name_key, var))
+            scattered_X = self.client.scatter(X, broadcast=True)
+            scattered_Y = self.client.scatter(Y, broadcast=True)
+            futures = []
+            for q in self.quantiles:
+                futures.append(self.client.submit(
+                    trainClf,
+                    q,
+                    maxDepth,
+                    minLeaf,
+                    scattered_X,
+
+                    scattered_Y,
+                    save = True,
+                    outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
+                    name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(q).replace('.','p')),
+                    X_names = features,Y_name=var))
+            progress(futures)
+            wait(futures)
+        else:
+            with parallel_backend(self.backend):
+                Parallel(n_jobs=len(self.quantiles),verbose=20)(
+                        delayed(trainClf)(
+                            q,
+                            maxDepth,
+                            minLeaf,
+                            X,
+                            Y,
+                            save = True,
+                            outDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir,weightsDir),
+                            name ='{}_weights_{}_{}_{}'.format(name_key,self.EBEE,var,str(q).replace('.','p')),
+                            X_names = features,Y_name=var) for q in self.quantiles)
 
 
     def correctY(self, var, n_jobs=1, diz=False):
@@ -310,8 +335,24 @@ class quantileRegression_chain(object):
         Y = Y.values.reshape(-1,1)
         Z = np.hstack([X,Y])
 
-        with parallel_backend(self.backend):
-            Ycorr = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(applyCorrection)(self.clfs_mc,self.clfs_d,ch[:,:-1],ch[:,-1],diz=diz) for ch in np.array_split(Z,n_jobs) ) )
+        if self.client:
+            n_workers = len(self.client.scheduler_info()['workers']) if len(self.client.scheduler_info()['workers']) > 0 else len(self.quantiles)
+            logger.info('Correcting variable {}, splitting matrix in {} distributed on the cluster'.format(var, n_workers))
+
+            future_splits = [self.client.submit(
+                    applyCorrection,
+                    self.clfs_mc,
+                    self.clfs_d,
+                    ch[:,:-1],
+                    ch[:,-1],
+                    diz=diz) for ch in np.array_split(Z, n_workers)]
+            Ycorr = np.concatenate(self.client.gather(future_splits))
+            self.MC['{}_corr'.format(var_raw)] = Ycorr
+            del future_splits
+
+        else:
+            with parallel_backend(self.backend):
+                Ycorr = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(applyCorrection)(self.clfs_mc,self.clfs_d,ch[:,:-1],ch[:,-1],diz=diz) for ch in np.array_split(Z,n_jobs) ) )
 
         self.MC['{}_corr'.format(var_raw)] = Ycorr
 
@@ -417,7 +458,7 @@ class quantileRegression_chain(object):
             X = self.MC.loc[:,features].values
             self.MC['{}_corr_1Reg'.format(var)] = self.MC[var] + self.scaler.inverse_transform(self.finalReg.predict(X).reshape(-1,1)).ravel()
 
-    def trainAllMC(self,weightsDir,n_jobs=1):
+    def trainAllMC(self,weightsDir, n_jobs=1):
         """
         Method to train all BDTs for MC. Multiple BDTs per variable are trained and applied, such that the
         BDTs for the next variable can be trained with the other corrected variables as inputs.
@@ -430,13 +471,10 @@ class quantileRegression_chain(object):
         """
 
         for var in self.vars:
-            try:
-                self.loadClfs(var,weightsDir)
-            except:
-                self.trainOnMC(var,weightsDir=weightsDir)
-                self.loadClfs(var,weightsDir)
+            self.trainOnMC(var,weightsDir=weightsDir)
+            self.loadClfs(var,weightsDir)
 
-            self.correctY(var,n_jobs=n_jobs)
+            self.correctY(var, n_jobs=n_jobs)
 
     def loadClfs(self, var, weightsDir):
         """
@@ -650,6 +688,10 @@ class quantileRegression_chain(object):
         register_parallel_backend('ipyparallel',lambda: joblib_be, make_default=True)
 
         self.backend = 'ipyparallel'
+
+
+    def setup_client(self, address):
+        self.client = Client(address)
 
 
 def trainClf(alpha,maxDepth,minLeaf,X,Y,save=False,outDir=None,name=None,X_names=None,Y_name=None):
