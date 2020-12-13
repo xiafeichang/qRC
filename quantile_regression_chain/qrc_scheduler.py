@@ -145,12 +145,6 @@ class QRCScheduler:
             associate the information to every qrc object
     """
     def __init__(self, config_file_name):
-        # Setup default Dask local cluster
-        self.cluster = LocalCluster()
-        logger.info('Setting up {}'.format(self.cluster))
-        self.client = Client(self.cluster)
-        logger.info('Setting up Client {}'.format(self.client))
-
         # Get information from yaml config file
         stream = open(config_file_name, 'r')
         input_dict = yaml.safe_load(stream)
@@ -232,6 +226,7 @@ class QRCScheduler:
         for qrc, path in zip(scan_dict(self.qrcs), scan_dict(self.paths)):
             dataset = path[0]
             if dataset == 'mc':
+                logger.info('Scheduling computation for {}; quantiles {}; variables {}'.format(path, qrc.quantiles, qrc.vars))
                 self.mc_futures.append(self.client.submit(qrc.trainAllMC, self.weights_dir))
         logger.info('Submitting MC training')
         progress(self.mc_futures)
@@ -294,13 +289,5 @@ class QRCScheduler:
         logger.info('Setting up Client {}'.format(self.client))
 
     def connect_to_cluster(self, cluster_id):
-        # Close default local cluster and disconnect client
-        self.client.close()
-        self.cluster.close()
-        logger.info('Closing default Client')
-        logger.info('Closing default LocalCluster')
-        del self.cluster
-        del self.client
-
         self.client = Client(cluster_id)
         logger.info('Setting up Client {}'.format(self.client))

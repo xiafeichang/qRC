@@ -7,7 +7,7 @@ import pandas as pd
 import pickle as pkl
 
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
-from dask.distributed import wait, get_client, worker_client
+from dask.distributed import wait, get_client
 
 from sklearn.ensemble import GradientBoostingRegressor
 from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
@@ -147,13 +147,15 @@ class quantileRegression_chain_disc(quantileRegression_chain):
             self.MC['{}_shift_final'.format(var)] = Y_shift
             del future_splits
         else:
-            Y_shift = applyShift(
+            future_splits = [client.submit(applyShift,
                     self.p0tclf_mc,
                     self.p0tclf_d,
                     self.clfs_mc,
-                    Z[:,:-1],
-                    Z[:,-1])
+                    ch[:,:-1],
+                    ch[:,-1]) for ch in np.array_split(Z, n_workers)]
+            Y_shift = np.concatenate(client.gather(future_splits))
             self.MC['{}_shift'.format(var)] = Y_shift
+            del future_splits
 
 
     def shiftY2D(self,varrs,client,finalReg=False,n_jobs=1):
@@ -182,13 +184,14 @@ class quantileRegression_chain_disc(quantileRegression_chain):
             self.MC['{}_shift_final'.format(varrs[0])] = Y_shift[:,0]
             self.MC['{}_shift_final'.format(varrs[1])] = Y_shift[:,1]
         else:
-            Y_shift = apply2DShift(
+            future_splits = [client.submit(apply2DShift,
                     self.TCatclf_mc,
                     self.TCatclf_d,
                     self.tail_clfs_mc[varrs[0]],
                     self.tail_clfs_mc[varrs[1]],
-                    Z[:,:-2],
-                    Z[:,-2:])
+                    ch[:,:-2],
+                    ch[:,-2:]) for ch in np.array_split(Z, n_workers)]
+            Y_shift = np.concatenate(client.gather(future_splits))
             self.MC['{}_shift'.format(varrs[0])] = Y_shift[:,0]
             self.MC['{}_shift'.format(varrs[1])] = Y_shift[:,1]
 
@@ -199,7 +202,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
             self.shiftY(var, client)
         elif len(self.vars)>1 and '{}_shift'.format(var) not in self.MC.columns:
             self.shiftY2D(self.vars, client)
-        super(quantileRegression_chain_disc, self).correctY(var='{}_shift'.format(var), diz=True)
+        super(quantileRegression_chain_disc, self).correctY(var='{}_shift'.format(var), client=client, diz=True)
 
     def applyFinalRegression(self,var,n_jobs=1):
 
@@ -244,22 +247,20 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
     def trainAllMC(self,weightsDir):
 
-        with worker_client() as client:
+        with get_client() as client:
             # Train tail regressors
             try:
                 self.loadTailRegressors(self.vars,weightsDir)
-            except:
-                futures = []
+            except FileNotFoundError:
                 for var in self.vars:
                     self.trainTailRegressors(var, client, weightsDir)
-
                 self.loadTailRegressors(self.vars,weightsDir)
 
             n_workers = len(client.scheduler_info()['workers'])
             for var in self.vars:
                 try:
                     self.loadClfs(var,weightsDir)
-                except:
+                except FileNotFoundError:
                     logger.info('Training MC for variable {}'.format(var))
                     futures = self.trainOnMC(var=var, client=client, weightsDir=weightsDir)
                     wait(futures)
@@ -271,7 +272,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
                         self.load3Catclf(self.vars,weightsDir)
                     else:
                         self.loadp0tclf(var,weightsDir)
-                except:
+                except FileNotFoundError:
                     if len(self.vars)>1:
                         self.train3Catclf(self.vars,'mc',weightsDir, n_workers)
                         self.load3Catclf(self.vars,weightsDir)
