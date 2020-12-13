@@ -7,7 +7,7 @@ import pandas as pd
 import pickle as pkl
 
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
-from dask.distributed import wait, get_client, worker_client
+from dask.distributed import wait, get_client, worker_client, secede, rejoin
 
 from sklearn.ensemble import GradientBoostingRegressor
 from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
@@ -244,14 +244,15 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
     def trainAllMC(self,weightsDir):
 
-        with worker_client() as client:
+        with get_client() as client:
             # Train tail regressors
             try:
                 self.loadTailRegressors(self.vars,weightsDir)
-            except:
-                futures = []
+            except FileNotFoundError:
                 for var in self.vars:
+                    #secede()
                     self.trainTailRegressors(var, client, weightsDir)
+                    #rejoin()
 
                 self.loadTailRegressors(self.vars,weightsDir)
 
@@ -259,11 +260,13 @@ class quantileRegression_chain_disc(quantileRegression_chain):
             for var in self.vars:
                 try:
                     self.loadClfs(var,weightsDir)
-                except:
+                except FileNotFoundError:
                     logger.info('Training MC for variable {}'.format(var))
+                    #secede()
                     futures = self.trainOnMC(var=var, client=client, weightsDir=weightsDir)
                     wait(futures)
                     del futures
+                    #rejoin()
                     self.loadClfs(var,weightsDir)
 
                 try:
@@ -271,7 +274,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
                         self.load3Catclf(self.vars,weightsDir)
                     else:
                         self.loadp0tclf(var,weightsDir)
-                except:
+                except FileNotFoundError:
                     if len(self.vars)>1:
                         self.train3Catclf(self.vars,'mc',weightsDir, n_workers)
                         self.load3Catclf(self.vars,weightsDir)

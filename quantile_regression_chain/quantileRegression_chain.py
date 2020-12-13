@@ -11,7 +11,7 @@ import ROOT as rt
 import uproot4
 
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
-from dask.distributed import wait, get_client, worker_client, progress
+from dask.distributed import wait, get_client, worker_client, progress, secede, rejoin
 
 from .tmva.IdMVAComputer import IdMvaComputer, helpComputeIdMva
 from .tmva.eleIdMVAComputer import eleIdMvaComputer, helpComputeEleIdMva
@@ -459,15 +459,17 @@ class quantileRegression_chain(object):
             Directory where the weight files will be stored. Data weights have to be in there.
         """
 
-        with worker_client() as client:
+        with get_client() as client:
             for var in self.vars:
                 try:
                     self.loadClfs(var,weightsDir)
-                except:
+                except FileNotFoundError:
+                    #secede()
                     futures = self.trainOnMC(var,weightsDir=weightsDir,client=client)
 
                     wait(futures)
                     del futures
+                    #rejoin()
 
                     self.loadClfs(var,weightsDir)
 
