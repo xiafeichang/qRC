@@ -287,7 +287,7 @@ class quantileRegression_chain(object):
 
         return futures
 
-    def correctY(self, var, diz=False):
+    def correctY(self, var, client, diz=False):
         """
         Medthod to apply correction for  one variable in MC. BDTs for data and MC have to be loaded first,
         using ``loadClfs``.
@@ -315,12 +315,16 @@ class quantileRegression_chain(object):
         Y = Y.values.reshape(-1,1)
         Z = np.hstack([X,Y])
 
-        Ycorr = applyCorrection(
-                self.clfs_mc,
-                self.clfs_d,
-                Z[:,:-1],
-                Z[:,-1],
-                diz=diz)
+        n_workers = len(client.scheduler_info()['workers']) if len(client.scheduler_info()['workers']) > 0 else len(self.quantiles)
+        logger.info('Correcting variable {}, splitting matrix in {} distributed on the cluster'.format(var, n_workers))
+        future_splits = [client.submit(
+            applyCorrection,
+            self.clfs_mc,
+            self.clfs_d,
+            ch[:,:-1],
+            ch[:,-1],
+            diz=diz) for ch in np.array_split(Z, n_workers)]
+        Ycorr = np.concatenate(client.gather(future_splits))
         self.MC['{}_corr'.format(var_raw)] = Ycorr
 
 
@@ -474,7 +478,7 @@ class quantileRegression_chain(object):
                     self.loadClfs(var,weightsDir)
 
                 logger.debug('Correcting Y for var {}'.format(var))
-                self.correctY(var)
+                self.correctY(var, client)
 
 
     def loadClfs(self, var, weightsDir):
