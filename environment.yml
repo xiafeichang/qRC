@@ -1,0 +1,20 @@
+name: QRC_env
+channels:
+  - conda-forge
+dependencies:
+  - python=3.7
+  - jupyterlab>=2.0.0
+  - numpy>=1.18.1
+  - pandas
+  - bokeh>=2.0.0
+  - dask=2.20.0
+  - nodejs
+  - distributed=2.20.0
+  - dask-jobqueue
+  - notebook
+  - ipywidgets>=7.5
+  - root
+  - uproot4
+  - aghast
+  - boost-histogram
+  - mplhep
