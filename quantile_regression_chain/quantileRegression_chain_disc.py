@@ -134,7 +134,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
         logger.info('Shifting {} with input features {}'.format(var,features))
 
-        n_workers = len(client.scheduler_info()['workers'])
+        n_workers = len(client.scheduler_info()['workers']) -1
 
         if finalReg:
             future_splits = [client.submit(applyShift,
@@ -170,7 +170,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         Y = Y.values.reshape(-1,2)
         Z = np.hstack([X,Y])
 
-        n_workers = len(client.scheduler_info()['workers'])
+        n_workers = len(client.scheduler_info()['workers']) - 1
 
         if finalReg:
             future_splits = [client.submit(apply2DShift,

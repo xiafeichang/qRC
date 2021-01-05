@@ -49,7 +49,7 @@ class quantileRegression_chain(object):
             self.quantiles = quantiles
         self.backend = 'loky'
         self.EBEE = EBEE
-        self.branches = ['probeScEta','probeEtaWidth','probeR9','weight','probeSigmaRR','tagChIso03','probeChIso03','probeS4','tagR9','tagPhiWidth_Sc','probePt','tagSigmaRR','probePhiWidth','probeChIso03worst','puweight','tagEleMatch','tagPhi','probeScEnergy','nvtx','probePhoIso','tagPhoIso','run','tagScEta','probeEleMatch','probeCovarianceIeIp','tagPt','rho','tagS4','tagSigmaIeIe','tagCovarianceIpIp','tagCovarianceIeIp','tagScEnergy','tagChIso03worst','probeSigmaIeIe','probePhi','mass','probeCovarianceIpIp','tagEtaWidth_Sc','probeHoE','probeFull5x5_e1x5','probeFull5x5_e5x5','probeNeutIso','probePassEleVeto']
+        self.branches = ['probeScEta','probeEtaWidth_Sc','probeR9','weight','probeSigmaRR','tagChIso03','probeChIso03','probeS4','tagR9','tagPhiWidth_Sc','probePt','tagSigmaRR','probePhiWidth_Sc','probeChIso03worst','puweight','tagEleMatch','tagPhi','probeScEnergy','nvtx','probePhoIso','tagPhoIso','run','tagScEta','probeEleMatch','probeCovarianceIeIp','tagPt','rho','tagS4','tagSigmaIeIe','tagCovarianceIpIp','tagCovarianceIeIp','tagScEnergy','tagChIso03worst','probeSigmaIeIe','probePhi','mass','probeCovarianceIpIp','tagEtaWidth_Sc','probeHoE','probeFull5x5_e1x5','probeFull5x5_e5x5','probeNeutIso','probePassEleVeto']
 
         if year == '2016':
             self.branches = self.branches + ['probePass_invEleVeto','probeCovarianceIetaIphi','probeCovarianceIphiIphi','probeCovarianceIetaIphi','probeCovarianceIphiIphi']
@@ -66,7 +66,7 @@ class quantileRegression_chain(object):
         self.phimax =  3.14
 
 
-    def loadROOT(self,path,tree,outname,cut=None,split=None,rndm=12345):
+    def loadROOT(self, path, tree, outname, cut=None, split=None, rndm=12345, uncorr=False):
         """
         Method to load a *.root dataset. Selects events in Barrel or Endcap only, depending on how class was initialized.
         Also possible to split dataset into training and testing datasets. The dataset(s) is stored as a pandas dataframe
@@ -85,6 +85,8 @@ class quantileRegression_chain(object):
             Number between 0 and 1 to determine the fraction of the training sample w.r.t to the total sample size
         rndm : int, default ``12345``
             Random seed for event shuffling
+        uncorr: True -> the variables we want are stored in the file with the suffix "_uncorr"
+                False -> Thomas default
         Returns
         -------
         df: pandas dataframe
@@ -97,7 +99,20 @@ class quantileRegression_chain(object):
         if self.year == '2016' and 'Data' not in tree:
             df = up_tree.arrays(self.branches + ['probePhoIso_corr'], library = 'pd')
         else:
-            df = up_tree.arrays(self.branches, library = 'pd')
+            if uncorr:
+                interesting_vars = ['probeCovarianceIeIp', 'probeS4', 'probeR9', 'probePhiWidth', 'probeSigmaIeIe', 'probeEtaWidth',
+                        'probeChIso03', 'probeChIso03worst', 'probePhoIso']
+                interesting_vars_uncorr = list(map(lambda x: '{}_uncorr'.format(x), interesting_vars))
+                to_extract = self.branches.copy()
+                for vcorr, vuncorr in zip(interesting_vars, interesting_vars_uncorr):
+                    if vcorr in to_extract:
+                        to_extract.remove(vcorr)
+                        to_extract.append(vuncorr)
+                df = up_tree.arrays(to_extract, library = 'pd')
+                df.rename(columns={old: new for (old, new) in zip(interesting_vars_uncorr, interesting_vars)}, inplace=True)
+            else:
+                df = up_tree.arrays(self.branches, library = 'pd')
+                df.rename(columns={'probeEtaWidth_Sc': 'probeEtaWidth', 'probePhiWidth_Sc': 'probePhiWidth'}, inplace=True)
 
         logger.info('Dataframe with columns {}'.format(df.columns))
         index = np.array(df.index)
@@ -315,7 +330,7 @@ class quantileRegression_chain(object):
         Y = Y.values.reshape(-1,1)
         Z = np.hstack([X,Y])
 
-        n_workers = len(client.scheduler_info()['workers']) if len(client.scheduler_info()['workers']) > 0 else len(self.quantiles)
+        n_workers = len(client.scheduler_info()['workers'])-1 if len(client.scheduler_info()['workers']) > 0 else len(self.quantiles)
         logger.info('Correcting variable {}, splitting matrix in {} distributed on the cluster'.format(var, n_workers))
         future_splits = [client.submit(
             applyCorrection,
