@@ -1,6 +1,5 @@
 import gzip
 import os
-#import ROOT as rt
 import xgboost as xgb
 import numpy as np
 import pandas as pd

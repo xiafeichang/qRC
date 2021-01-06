@@ -7,7 +7,6 @@ import xgboost as xgb
 import gzip
 import yaml
 import os
-import ROOT as rt
 import uproot4
 
 from joblib import delayed, Parallel, parallel_backend, register_parallel_backend
