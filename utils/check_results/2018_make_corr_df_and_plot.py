@@ -47,8 +47,8 @@ def main(args):
     ph = ['probePhoIso']
     year = '2018'
     n_evts = 4700000
-    workDir = '/work/gallim/dataframes/2018'
-    weightsDirs = '/work/gallim/weights/2018_mc_full_dask'
+    workDir = '/work/gallim/dataframes/2018_flashgg_UNCORRECTED'
+    weightsDirs = '/work/gallim/weights/2018_flashgg_UNCORRECTED'
 
     cols = ["mass","probeScEnergy","probeScEta","probePhi","run","weight",
             "weight_clf","rho","probeR9","probeSigmaIeIe","probePhiWidth",
@@ -118,6 +118,24 @@ def main(args):
         qrc_ch_EE.loadClfs(var,weightsDirs)
         qrc_ch_EE.correctY(var, client)
 
+    # Photon ID
+    logger.info('Performing Photon ID')
+
+    weights = ('/work/gallim/weights/id_mva/HggPhoId_94X_barrel_BDT_v2.weights.xml', '/work/gallim/weights/id_mva/HggPhoId_94X_endcap_BDT_v2.weights.xml')
+
+    qrc_ch_EB.data['probeScPreshowerEnergy'] = -999.*np.ones(qrc_ch_EB.data.index.size)
+    qrc_ch_EB.MC['probeScPreshowerEnergy'] = -999.*np.ones(qrc_ch_EB.MC.index.size)
+    qrc_ch_EE.data['probeScPreshowerEnergy'] = -999.*np.ones(qrc_ch_EE.data.index.size)
+    qrc_ch_EE.MC['probeScPreshowerEnergy'] = -999.*np.ones(qrc_ch_EE.MC.index.size)
+
+    mvas_EB = [("newPhoID", "data", []), ("newPhoIDcorrAll", "qr", qrc_EB.vars + qrc_ph_EB.vars + qrc_ch_EB.vars)]
+    mvas_EE = [("newPhoID", "data", []), ("newPhoIDcorrAll", "qr", qrc_EE.vars + qrc_ph_EE.vars + qrc_ch_EE.vars)]
+
+    qrc_ch_EB.computeIdMvas(mvas_EB[:1], weights, 'data', n_jobs=10, leg2016=False)
+    qrc_ch_EB.computeIdMvas(mvas_EB, weights, 'mc', n_jobs=10, leg2016=False)
+    qrc_ch_EE.computeIdMvas(mvas_EE[:1], weights, 'data', n_jobs=10, leg2016=False)
+    qrc_ch_EE.computeIdMvas(mvas_EE, weights, 'mc', n_jobs=10, leg2016=False)
+
     # Produce output files
 
     output_name_EB = 'final_output_EB'
@@ -125,6 +143,9 @@ def main(args):
 
     qrc_ch_EB.MC.to_hdf('{}/{}.h5'.format(workDir, output_name_EB),'df',mode='w',format='t')
     qrc_ch_EE.MC.to_hdf('{}/{}.h5'.format(workDir, output_name_EE),'df',mode='w',format='t')
+    qrc_ch_EB.data.to_hdf('{}/{}.h5'.format(workDir, output_name_EB + '_data'),'df',mode='w',format='t')
+    qrc_ch_EE.data.to_hdf('{}/{}.h5'.format(workDir, output_name_EE + '_data'),'df',mode='w',format='t')
+
     #qrc_ch_EB.MC.to_hdf('{}/{}.h5'.format(weightsDirs, output_name_EB),'df',mode='w',format='t')
     #qrc_ch_EE.MC.to_hdf('{}/{}.h5'.format(weightsDirs, output_name_EE),'df',mode='w',format='t')
 
