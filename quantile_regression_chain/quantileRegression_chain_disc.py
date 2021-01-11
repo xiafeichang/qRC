@@ -37,7 +37,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         X = df.loc[:,features].values
         Y = df['p0t_{}'.format(var)].values
         clf = xgb.XGBClassifier(n_estimators=300,learning_rate=0.05,maxDepth=10,subsample=0.5,gamma=0, n_jobs=n_jobs)
-        with parallel_backend(self.backend):
+        with parallel_backend(self.backend, self.scheduler_host):
             clf.fit(X,Y)
 
         X_names = features
@@ -61,7 +61,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         X = df.loc[:,features].values
         Y = df['ChIsoCat'].values
         clf = xgb.XGBClassifier(n_estimators=500, learning_rate=0.05, maxDepth=10,gamma=0, n_jobs=n_jobs)
-        with parallel_backend(self.backend):
+        with parallel_backend(self.backend, self.scheduler_host):
             clf.fit(X,Y)
 
         X_names = features
@@ -83,8 +83,8 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         X = self.MC.query('{}!=0'.format(var)).loc[:,features].values
         Y = self.MC.query('{}!=0'.format(var))[var].values
 
-        with parallel_backend(self.backend):
-            Parallel(n_jobs=len(self.quantiles),verbose=20)(delayed(trainClf)(q,5,500,X,Y,save=True,outDir='{}/{}'.format(self.workDir,weightsDir),name='mc_weights_tail_{}_{}_{}'.format(self.EBEE,var,str(q).replace('.','p')),X_names=features,Y_name=var) for q in self.quantiles)
+        with parallel_backend(self.backend, self.scheduler_host):
+            Parallel(verbose=20)(delayed(trainClf)(q,5,500,X,Y,save=True,outDir='{}/{}'.format(self.workDir,weightsDir),name='mc_weights_tail_{}_{}_{}'.format(self.EBEE,var,str(q).replace('.','p')),X_names=features,Y_name=var) for q in self.quantiles)
 
     def loadTailRegressors(self,varrs,weightsDir):
 
@@ -111,12 +111,12 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         logger.info('Shifting {} with input features {}'.format(var,features))
 
         if finalReg:
-            with parallel_backend(self.backend):
-                Y_shift = np.concatenate(Parallel(n_jobs=n_jobs, verbose=20)(delayed(applyShift)(self.p0tclf_mc,self.p0tclf_d,[self.finalTailRegs[var]],sli[:,:-1],sli[:,-1]) for sli in np.array_split(Z,n_jobs)))
+            with parallel_backend(self.backend, self.scheduler_host):
+                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(applyShift)(self.p0tclf_mc,self.p0tclf_d,[self.finalTailRegs[var]],sli[:,:-1],sli[:,-1]) for sli in np.array_split(Z,n_jobs)))
             self.MC['{}_shift_final'.format(var)] = Y_shift
         else:
-            with parallel_backend(self.backend):
-                Y_shift = np.concatenate(Parallel(n_jobs=n_jobs, verbose=20)(delayed(applyShift)(self.p0tclf_mc,self.p0tclf_d,self.clfs_mc,sli[:,:-1],sli[:,-1]) for sli in np.array_split(Z,n_jobs)))
+            with parallel_backend(self.backend, self.scheduler_host):
+                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(applyShift)(self.p0tclf_mc,self.p0tclf_d,self.clfs_mc,sli[:,:-1],sli[:,-1]) for sli in np.array_split(Z,n_jobs)))
             self.MC['{}_shift'.format(var)] = Y_shift
 
 
@@ -133,13 +133,13 @@ class quantileRegression_chain_disc(quantileRegression_chain):
         Z = np.hstack([X,Y])
 
         if finalReg:
-            with parallel_backend(self.backend):
-                Y_shift = np.concatenate(Parallel(n_jobs=n_jobs, verbose=20)(delayed(apply2DShift)(self.TCatclf_mc,self.TCatclf_d,[self.finalTailRegs[varrs[0]]],[self.finalTailRegs[varrs[1]]],sli[:,:-2],sli[:,-2:]) for sli in np.array_split(Z,n_jobs)))
+            with parallel_backend(self.backend, self.scheduler_host):
+                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(apply2DShift)(self.TCatclf_mc,self.TCatclf_d,[self.finalTailRegs[varrs[0]]],[self.finalTailRegs[varrs[1]]],sli[:,:-2],sli[:,-2:]) for sli in np.array_split(Z,n_jobs)))
             self.MC['{}_shift_final'.format(varrs[0])] = Y_shift[:,0]
             self.MC['{}_shift_final'.format(varrs[1])] = Y_shift[:,1]
         else:
-            with parallel_backend(self.backend):
-                Y_shift = np.concatenate(Parallel(n_jobs=n_jobs, verbose=20)(delayed(apply2DShift)(self.TCatclf_mc,self.TCatclf_d,self.tail_clfs_mc[varrs[0]],self.tail_clfs_mc[varrs[1]],sli[:,:-2],sli[:,-2:]) for sli in np.array_split(Z,n_jobs)))
+            with parallel_backend(self.backend, self.scheduler_host):
+                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(apply2DShift)(self.TCatclf_mc,self.TCatclf_d,self.tail_clfs_mc[varrs[0]],self.tail_clfs_mc[varrs[1]],sli[:,:-2],sli[:,-2:]) for sli in np.array_split(Z,n_jobs)))
             self.MC['{}_shift'.format(varrs[0])] = Y_shift[:,0]
             self.MC['{}_shift'.format(varrs[1])] = Y_shift[:,1]
 
