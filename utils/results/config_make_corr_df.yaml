@@ -1,0 +1,46 @@
+dataframes:
+  data:
+    EB:
+      input: df_data_EB_test.h5
+      output: MIX_df_data_EB_test_IdMVA_5M.h5
+    EE:
+      input: df_data_EE_test.h5
+      output: MIX_df_data_EE_test_IdMVA_5M.h5
+  mc:
+    EB:
+      input: df_mc_EB_test.h5
+      output: MIX_df_mc_EB_test_corr_clf_5M.h5
+    EE:
+      input: df_mc_EE_test.h5
+      output: MIX_df_mc_EE_test_corr_clf_5M.h5
+
+showerShapes:
+  ['probeCovarianceIeIp','probeS4','probeR9','probePhiWidth','probeSigmaIeIe','probeEtaWidth']
+
+chIsos:
+  ['probeChIso03','probeChIso03worst']
+
+year:
+ 2018
+
+workDir:
+  /work/gallim/dataframes/2018_flashgg_UNCORRECTED
+
+weightsDirs:
+  showerShapes:
+    /work/gallim/weights/2018_MIX
+  phoIso:
+    /work/gallim/weights/2018_MIX
+  chIsos:
+    /work/gallim/weights/2018_MIX
+
+finalWeightsDirs:
+  showerShapes:
+    #/scratch/gallim/final
+    /work/gallim/weights/2018_MIX/final
+  phoIso:
+    #/scratch/gallim/final
+    /work/gallim/weights/2018_MIX/final
+  chIsos:
+    #/scratch/gallim/final
+    /work/gallim/weights/2018_MIX/final
