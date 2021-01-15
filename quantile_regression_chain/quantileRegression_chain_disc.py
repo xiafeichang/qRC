@@ -116,7 +116,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
             self.MC['{}_shift_final'.format(var)] = Y_shift
         else:
             with parallel_backend(self.backend, self.scheduler_host):
-                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(applyShift)(self.p0tclf_mc,self.p0tclf_d,self.clfs_mc,sli[:,:-1],sli[:,-1]) for sli in np.array_split(Z,n_jobs)))
+                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(applyShift)(self.p0tclf_mc,self.p0tclf_d,self.clfs_mc,sli[:,:-1],sli[:,-1]) for sli in np.array_split(Z, n_jobs)))
             self.MC['{}_shift'.format(var)] = Y_shift
 
 
@@ -134,12 +134,12 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
         if finalReg:
             with parallel_backend(self.backend, self.scheduler_host):
-                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(apply2DShift)(self.TCatclf_mc,self.TCatclf_d,[self.finalTailRegs[varrs[0]]],[self.finalTailRegs[varrs[1]]],sli[:,:-2],sli[:,-2:]) for sli in np.array_split(Z,n_jobs)))
+                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(apply2DShift)(self.TCatclf_mc,self.TCatclf_d,[self.finalTailRegs[varrs[0]]],[self.finalTailRegs[varrs[1]]],sli[:,:-2],sli[:,-2:]) for sli in np.array_split(Z, n_jobs)))
             self.MC['{}_shift_final'.format(varrs[0])] = Y_shift[:,0]
             self.MC['{}_shift_final'.format(varrs[1])] = Y_shift[:,1]
         else:
             with parallel_backend(self.backend, self.scheduler_host):
-                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(apply2DShift)(self.TCatclf_mc,self.TCatclf_d,self.tail_clfs_mc[varrs[0]],self.tail_clfs_mc[varrs[1]],sli[:,:-2],sli[:,-2:]) for sli in np.array_split(Z,n_jobs)))
+                Y_shift = np.concatenate(Parallel(verbose=20)(delayed(apply2DShift)(self.TCatclf_mc,self.TCatclf_d,self.tail_clfs_mc[varrs[0]],self.tail_clfs_mc[varrs[1]],sli[:,:-2],sli[:,-2:]) for sli in np.array_split(Z, n_jobs)))
             self.MC['{}_shift'.format(varrs[0])] = Y_shift[:,0]
             self.MC['{}_shift'.format(varrs[1])] = Y_shift[:,1]
 
@@ -205,6 +205,8 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
     def trainFinalTailRegressor(self,var,weightsDir,weightsDirIn,n_jobs=1):
 
+        weightsDir = weightsDir if weightsDir.startswith('/') else '{}/{}'.format(self.workDir, weightsDir)
+
         if len(self.vars) == 1:
             self.loadClfs(var,weightsDirIn)
             self.MC.loc[self.MC[var] != 0,'cdf_{}'.format(var)] = self._getCondCDF(self.MC.loc[self.MC[var] != 0,:],self.clfs_mc,self.kinrho,var)
@@ -222,7 +224,7 @@ class quantileRegression_chain_disc(quantileRegression_chain):
 
         name = 'weights_finalTailRegressor_{}_{}'.format(self.EBEE,var)
         dic = {'clf': clf, 'X': features, 'Y': var}
-        pkl.dump(dic,gzip.open('{}/{}/{}.pkl'.format(self.workDir,weightsDir,name),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
+        pkl.dump(dic,gzip.open('{}/{}.pkl'.format(weightsDir,name),'wb'),protocol=pkl.HIGHEST_PROTOCOL)
 
     def loadFinalTailRegressor(self,varrs,weightsDir):
 
