@@ -15,15 +15,17 @@ def main(options):
 
     workDir = '/work/gallim/dataframes/2018_flashgg_UNCORRECTED'
     tmpl = 'df_{}_{}_train'
+    tmpl_iso = 'df_{}_{}_Iso_train'
 
     for dset in ['mc', 'data']:
         for det in ['EB', 'EE']:
-            name = tmpl.format(dset, det)
-            print('Creating dataframe {}'.format(name))
-            inp = pd.read_hdf('{}/{}.h5'.format(workDir, name), stop=options.n_evts)
-            df1, df2 = split_df(inp)
-            df1.to_hdf('{}/{}_spl1.h5'.format(workDir, name),'df',mode='w',format='t')
-            df2.to_hdf('{}/{}_spl2.h5'.format(workDir, name),'df',mode='w',format='t')
+            for t in [tmpl, tmpl_iso]:
+                name = t.format(dset, det)
+                print('Creating dataframe from {}.h5'.format(name))
+                inp = pd.read_hdf('{}/{}.h5'.format(workDir, name), stop=options.n_evts)
+                df1, df2 = split_df(inp)
+                df1.to_hdf('{}/{}_spl1.h5'.format(workDir, name),'df',mode='w',format='t')
+                df2.to_hdf('{}/{}_spl2.h5'.format(workDir, name),'df',mode='w',format='t')
 
 
 if __name__ == "__main__":
