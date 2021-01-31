@@ -12,13 +12,13 @@ variables:
   ['probeChIso03','probeChIso03worst']
 
 year:
-  2017
+  2018
 
 workDir:
-  /work/gallim/dataframes/2017
+  /work/gallim/dataframes/2018_flashgg_UNCORRECTED
 
 weightsDir:
-  /work/gallim/weights/2017
+  /work/gallim/weights/2018_MIX
 
 outDir:
-  /work/gallim/weights/2017
+  /work/gallim/weights/2018_MIX

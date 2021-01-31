@@ -18,7 +18,7 @@ workDir:
   /work/gallim/dataframes/2018_flashgg_UNCORRECTED
 
 weightsDir:
-  /work/gallim/weights/2018_joblib
+  /work/gallim/weights/2018_MIX
 
 outDir:
-  /work/gallim/weights/2018_joblib
+  /work/gallim/weights/2018_MIX
