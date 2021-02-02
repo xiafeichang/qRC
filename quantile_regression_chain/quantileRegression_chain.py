@@ -46,7 +46,6 @@ class quantileRegression_chain(object):
         else:
             self.quantiles = quantiles
         self.backend = 'loky'
-        self.scheduler_host = None
         self.EBEE = EBEE
         self.branches = ['probeScEta','probeEtaWidth_Sc','probeR9','weight','probeSigmaRR','tagChIso03','probeChIso03','probeS4','tagR9','tagPhiWidth_Sc','probePt','tagSigmaRR','probePhiWidth_Sc','probeChIso03worst','puweight','tagEleMatch','tagPhi','probeScEnergy','nvtx','probePhoIso','tagPhoIso','run','tagScEta','probeEleMatch','probeCovarianceIeIp','tagPt','rho','tagS4','tagSigmaIeIe','tagCovarianceIpIp','tagCovarianceIeIp','tagScEnergy','tagChIso03worst','probeSigmaIeIe','probePhi','mass','probeCovarianceIpIp','tagEtaWidth_Sc','probeHoE','probeFull5x5_e1x5','probeFull5x5_e5x5','probeNeutIso','probePassEleVeto']
 
@@ -267,8 +266,8 @@ class quantileRegression_chain(object):
 
         logger.info('Training quantile regression on {} for {} with features {}'.format(key,var,features))
 
-        with parallel_backend(self.backend, self.scheduler_host):
-            Parallel(verbose=20)(
+        with parallel_backend(self.backend):
+            Parallel(n_jobs=len(self.quantiles),verbose=20)(
                     delayed(trainClf)(
                         q,
                         maxDepth,
@@ -310,8 +309,8 @@ class quantileRegression_chain(object):
         Y = Y.values.reshape(-1,1)
         Z = np.hstack([X,Y])
 
-        with parallel_backend(self.backend, self.scheduler_host):
-            Ycorr = np.concatenate(Parallel(verbose=20)(delayed(applyCorrection)(self.clfs_mc,self.clfs_d,ch[:,:-1],ch[:,-1],diz=diz) for ch in np.array_split(Z,n_jobs) ) )
+        with parallel_backend(self.backend):
+            Ycorr = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(applyCorrection)(self.clfs_mc,self.clfs_d,ch[:,:-1],ch[:,-1],diz=diz) for ch in np.array_split(Z,n_jobs) ) )
 
         self.MC['{}_corr'.format(var_raw)] = Ycorr
 
@@ -593,12 +592,12 @@ class quantileRegression_chain(object):
             stride = int(self.data.index.size / n_jobs)
         logger.info("Computing %s, correcting %s, stride %s" % (name,correctedVariables,stride) )
         if key == 'mc':
-            with parallel_backend(self.backend, self.scheduler_host):
-                Y = np.concatenate(Parallel(verbose=20)(delayed(helpComputeIdMva)(weightsEB,weightsEE,correctedVariables,self.MC[ch:ch+stride],tpC, leg2016) for ch in range(0,self.MC.index.size,stride)))
+            with parallel_backend(self.backend):
+                Y = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(helpComputeIdMva)(weightsEB,weightsEE,correctedVariables,self.MC[ch:ch+stride],tpC, leg2016) for ch in range(0,self.MC.index.size,stride)))
             self.MC[name] = Y
         elif key == 'data':
-            with parallel_backend(self.backend, self.scheduler_host):
-                Y = np.concatenate(Parallel(verbose=20)(delayed(helpComputeIdMva)(weightsEB,weightsEE,correctedVariables,self.data[ch:ch+stride],tpC, leg2016) for ch in range(0,self.data.index.size,stride)))
+            with parallel_backend(self.backend):
+                Y = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(helpComputeIdMva)(weightsEB,weightsEE,correctedVariables,self.data[ch:ch+stride],tpC, leg2016) for ch in range(0,self.data.index.size,stride)))
             self.data[name] = Y
 
     def computeEleIdMvas(self,mvas,weights,key,n_jobs=1,leg2016=False):
@@ -623,16 +622,16 @@ class quantileRegression_chain(object):
             stride = self.data.index.size / n_jobs
         logger.info("Computing %s, correcting %s, stride %s" % (name,correctedVariables,stride))
         if key == 'mc':
-            with parallel_backend(self.backend, self.scheduler_host):
-                Y = np.concatenate(Parallel(verbose=20)(delayed(helpComputeEleIdMva)(weightsEB1,weightsEB2,weightsEE,correctedVariables,self.MC[ch:ch+stride],tpC, leg2016) for ch in range(0,self.MC.index.size,stride)))
+            with parallel_backend(self.backend):
+                Y = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(helpComputeEleIdMva)(weightsEB1,weightsEB2,weightsEE,correctedVariables,self.MC[ch:ch+stride],tpC, leg2016) for ch in range(0,self.MC.index.size,stride)))
             self.MC[name] = Y
         elif key == 'data':
-            with parallel_backend(self.backend, self.scheduler_host):
-                Y = np.concatenate(Parallel(verbose=20)(delayed(helpComputeEleIdMva)(weightsEB1,weightsEB2,weightsEE,correctedVariables,self.data[ch:ch+stride],tpC, leg2016) for ch in range(0,self.data.index.size,stride)))
+            with parallel_backend(self.backend):
+                Y = np.concatenate(Parallel(n_jobs=n_jobs,verbose=20)(delayed(helpComputeEleIdMva)(weightsEB1,weightsEB2,weightsEE,correctedVariables,self.data[ch:ch+stride],tpC, leg2016) for ch in range(0,self.data.index.size,stride)))
             self.data[name] = Y
 
 
-    def setupJoblib(self, cluster_id=None):
+    def setupJoblib(self,ipp_profile='default',cluster_id=None):
         """
         Method to set ipyparallel backend to a running ipcluster
         Arguments
@@ -641,9 +640,15 @@ class quantileRegression_chain(object):
             Name of ipcluster profile for the started ipcluster that will be set up
         """
 
-        from distributed import Client
-        self.backend = 'dask'
-        self.scheduler_host = Client(cluster_id)
+        import ipyparallel as ipp
+        from ipyparallel.joblib import IPythonParallelBackend
+        global joblib_rc,joblib_view,joblib_be
+        joblib_rc = ipp.Client(profile=ipp_profile, cluster_id=cluster_id)
+        joblib_view = joblib_rc.load_balanced_view()
+        joblib_be = IPythonParallelBackend(view=joblib_view)
+        register_parallel_backend('ipyparallel',lambda: joblib_be, make_default=True)
+
+        self.backend = 'ipyparallel'
 
 
 def trainClf(alpha,maxDepth,minLeaf,X,Y,save=False,outDir=None,name=None,X_names=None,Y_name=None):
