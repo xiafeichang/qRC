@@ -74,9 +74,9 @@ def main(options):
     qRC_PI.data = qRC.data
 
     qRC_PI.loadp0tclf('probePhoIso',weightsDir=weightsDirs['phoIso'])
-    if options.backend is not None:
+    #if options.backend is not None:
         #qRC_PI.setupJoblib(options.backend, cluster_id = options.clusterid)
-        qRC_PI.setupJoblib(cluster_id = options.clusterid)
+        #qRC_PI.setupJoblib(cluster_id = options.clusterid)
     if options.final:
         qRC_PI.loadFinalRegression('probePhoIso',weightsDir=finalWeightsDirs['phoIso'])
         qRC_PI.loadFinalTailRegressor('probePhoIso',weightsDir=finalWeightsDirs['phoIso'])

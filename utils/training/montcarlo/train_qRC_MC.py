@@ -2,6 +2,17 @@ import argparse
 import yaml
 from quantile_regression_chain import quantileRegression_chain as QReg_C
 
+import logging
+logger = logging.getLogger("")
+
+def setup_logging(level=logging.DEBUG):
+    logger.setLevel(level)
+    formatter = logging.Formatter("%(name)s - %(levelname)s - %(message)s")
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
 
 def main(options):
 
@@ -17,8 +28,8 @@ def main(options):
 
     if options.split is not None:
         print('Using split dfs for training two sets of weights!')
-        df_name_data = df_name_data + '_spl{}.h5'.format(options.split)
-        df_name_mc = df_name_mc + '_spl{}.h5'.format(options.split)
+        df_name_data = df_name_data.replace('.h5', '') + '_spl{}.h5'.format(options.split)
+        df_name_mc = df_name_mc.replace('.h5', '') + '_spl{}.h5'.format(options.split)
         weightsDir = weightsDir + '/spl{}'.format(options.split)
 
     qRC = QReg_C(year,options.EBEE,workDir,variables)
@@ -41,4 +52,5 @@ if __name__ == "__main__":
     optArgs.add_argument('-B','--backend', action='store', type=str)
     optArgs.add_argument('-i','--clusterid', action='store', type=str)
     options=parser.parse_args()
+    setup_logging(logging.INFO)
     main(options)
