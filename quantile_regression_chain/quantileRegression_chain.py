@@ -631,7 +631,7 @@ class quantileRegression_chain(object):
             self.data[name] = Y
 
 
-    def setupJoblib(self,ipp_profile='default',cluster_id=None):
+    def setupJoblib(self, cluster_id=None):
         """
         Method to set ipyparallel backend to a running ipcluster
         Arguments
@@ -640,15 +640,13 @@ class quantileRegression_chain(object):
             Name of ipcluster profile for the started ipcluster that will be set up
         """
 
-        import ipyparallel as ipp
-        from ipyparallel.joblib import IPythonParallelBackend
-        global joblib_rc,joblib_view,joblib_be
-        joblib_rc = ipp.Client(profile=ipp_profile, cluster_id=cluster_id)
-        joblib_view = joblib_rc.load_balanced_view()
-        joblib_be = IPythonParallelBackend(view=joblib_view)
-        register_parallel_backend('ipyparallel',lambda: joblib_be, make_default=True)
+        import ray
+        from ray.util.joblib import register_ray
 
-        self.backend = 'ipyparallel'
+        ray.init(address=cluster_id)
+        register_ray()
+        logger.info('Connecting to Ray, {} nodes available'.format(len(ray.nodes())))
+        self.backend = 'ray'
 
 
 def trainClf(alpha,maxDepth,minLeaf,X,Y,save=False,outDir=None,name=None,X_names=None,Y_name=None):
