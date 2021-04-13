@@ -4,6 +4,36 @@ import matplotlib
 #matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
+
+
+def plot_contours(fig_name, output_dir, x_series, y_series, bins_array, ranges_array, weights=None, density=True):
+    x_name = x_series.name
+    y_name = y_series.name
+    histo, x_edges, y_edges = np.histogram2d(
+            x=x_series, y=y_series, bins=bins_array,
+            range=ranges_array, weights=weights, density=density
+            )
+
+    # Contour plots with colors from 2D numpy array requires to create both contour and contourf
+    # Style is hardcoded
+    fig, ax = plt.subplots()
+
+    contf = ax.contourf(x_edges[:-1], y_edges[:-1], histo.T, levels=10, cmap='Purples')
+    cont = ax.contour(x_edges[:-1], y_edges[:-1], histo.T, levels=10, linewidths=1.5, colors='k')
+    cb = fig.colorbar(contf)
+
+    ax.set_xlabel(x_name)
+    ax.set_ylabel(y_name)
+
+    print("Dumping contour plots for {} vs {}".format(x_name, y_name))
+    for fmt in ["png", "pdf"]:
+        fig.savefig("{}/{}.{}".format(output_dir, fig_name, fmt), bbox_inches='tight')
+
+    del fig
+    del ax
+
+
+
 def wcorr(arr1,arr2,weights):
     m1 = np.average(arr1,weights=weights)*np.ones_like(arr1)
     m2 = np.average(arr2,weights=weights)*np.ones_like(arr2)
