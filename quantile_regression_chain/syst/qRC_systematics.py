@@ -110,7 +110,7 @@ class systShift(object):
 
     def __init__(self, df1, df2, shiftFctn=None):
 
-        self.df = pd.DataFrame(columns=['diffTrainings', 'diffTrainings_transformed', 'newPhoIDcorrAll1', 'newPhoID1', 'newPhoIDtrcorrAll1', 'newPhoIDtr1', 'probePt', 'probeScEta', 'rho', 'weight_clf'], data=np.vstack((df1['newPhoIDcorrAll'] - df2['newPhoIDcorrAll'],df1['newPhoIDtrcorrAll'] - df2['newPhoIDtrcorrAll'],df1['newPhoIDcorrAll'],df1['newPhoID'],df1['newPhoIDtrcorrAll'],df1['newPhoIDtr'],df1['probePt'],df1['probeScEta'],df1['rho'],df1['weight_clf'])).T)
+        self.df = pd.DataFrame(columns=['diffTrainings', 'diffTrainings_transformed', 'newPhoIDcorrAll1', 'newPhoID1', 'newPhoIDtrcorrAll1', 'newPhoIDtr1', 'probePt', 'probeScEta', 'rho'], data=np.vstack((df1['newPhoIDcorrAll'] - df2['newPhoIDcorrAll'],df1['newPhoIDtrcorrAll'] - df2['newPhoIDtrcorrAll'],df1['newPhoIDcorrAll'],df1['newPhoID'],df1['newPhoIDtrcorrAll'],df1['newPhoIDtr'],df1['probePt'],df1['probeScEta'],df1['rho'])).T)
         if shiftFctn is None:
             self.const = True
             self.shiftFctn = utils.const
