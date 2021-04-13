@@ -4,30 +4,32 @@ from joblib import delayed, Parallel
 
 class IdMvaComputer:
 
-   def __init__(self,weightsEB,weightsEE,correct=[],tpC='qr',leg2016=False):
-      rt.gROOT.LoadMacro("./phoIDMVAonthefly.C")
-      
+   def __init__(self,weightsEB,weightsEE,correct=None,tpC='qr',leg2016=False):
+      if not correct:
+         correct = []
+      rt.gROOT.LoadMacro("~/phoIDMVAonthefly.C")
+
       self.rhoSubtraction = False
       # if type(correct) == dict:
       #    self.rhoSubtraction = correct["rhoSubtraction"]
       #    correct = correct["correct"]
-         
-      
+
+
       self.tpC = tpC
       self.leg2016 = leg2016
       self.X = rt.phoIDInput()
       self.readerEB = rt.bookReadersEB(weightsEB, self.X)
-      
+
       self.readerEE = rt.bookReadersEE(weightsEE, self.X, self.rhoSubtraction, self.leg2016)
-      
+
       # print ("IdMvaComputer.__init__")
       if leg2016:
          columns = ["probeScEnergy","probeScEta","rho","probeR9","probeSigmaIeIe","probePhiWidth","probeEtaWidth","probeCovarianceIetaIphi","probeS4","probePhoIso","probeChIso03","probeChIso03worst","probeSigmaRR","probeScPreshowerEnergy","probePt"]
       else:
-         columns = ["probeScEnergy","probeScEta","rho","probeR9","probeSigmaIeIe","probePhiWidth","probeEtaWidth","probeCovarianceIeIp","probeS4","probePhoIso","probeChIso03","probeChIso03worst","probeSigmaRR","probeScPreshowerEnergy","probePt"]
+         columns = ["probeScEnergy","probeScEta","rho","probeR9","probeSigmaIeIe","probePhiWidth","probeEtaWidth","probeCovarianceIeIp","probeS4","probePhoIso03","probeChIso03","probeChIso03worst","probeSigmaRR","probeEnovSCRawEn","probePt"]
 
       if self.rhoSubtraction:
-         self.effareas = np.array([[0.0000, 0.1210],   
+         self.effareas = np.array([[0.0000, 0.1210],
                                    [1.0000, 0.1107],
                                    [1.4790, 0.0699],
                                    [2.0000, 0.1056],
@@ -35,13 +37,13 @@ class IdMvaComputer:
                                    [2.3000, 0.1719],
                                    [2.4000, 0.1998],
          ])
-         
+
       # make list of input columns
       if self.tpC=="qr":
          print("Using variables corrected by quantile regression")
          self.columns = map(lambda x: x+"_corr" if x in correct else x, columns)
          print(self.columns)
-         
+
       elif self.tpC=="final":
          print("Using variables corrected by final regression")
          self.columns = map(lambda x: x+"_corr_1Reg" if x in correct else x, columns)
@@ -77,25 +79,25 @@ class IdMvaComputer:
          print("Using variables corrected by I2 quantile regression")
          self.columns = map(lambda x: x+"_corr_corrn-1_corr" if x in correct else x, columns)
          print(self.columns)
-      
+
       elif self.tpC=="I2n-1qr":
          print("Using variables corrected by I2 N-1 quantile regression")
          self.columns = map(lambda x: x+"_corr_corrn-1_corr_corrn-1" if x in correct else x, columns)
          print(self.columns)
-      
+
    def __call__(self,X):
 
       # make sure of order of the input columns and convert to a numpy array
-      Xvals = X[self.columns ].values
+      Xvals = X[self.columns].values
       #print self.columns
       #print Xvals[0]
- 
+
       return np.apply_along_axis( self.predict, 1, Xvals ).ravel()
-      
+
    def predict(self,row):
       return self.predictEB(row) if np.abs(row[1]) < 1.5 else self.predictEE(row)
       # return self.predictEB(row)
-      
+
    def predictEB(self,row):
       # use numeric indexes to speed up
       #print ("IdMvaComputer.predictEB")
@@ -116,7 +118,7 @@ class IdMvaComputer:
    def effArea(self,eta):
       ibin = min(self.effareas.shape[0]-1,bisect.bisect_left(self.effareas[:,0],eta))
       return self.effareas[ibin,1]
-   
+
    def predictEE(self,row):
       #print "IdMvaComputer.predictEE"
       self.X.phoIdMva_SCRawE_          = row[0]
@@ -133,9 +135,7 @@ class IdMvaComputer:
       self.X.phoIdMva_pfChgIso03_      = row[10]
       self.X.phoIdMva_pfChgIso03worst_ = row[11]
       self.X.phoIdMva_ESEffSigmaRR_    = row[12]
-      esEn                             = row[13]
-      ScEn                             = row[0]
-      self.X.phoIdMva_esEnovSCRawEn_ = esEn/ScEn
+      self.X.phoIdMva_esEnovSCRawEn_   = row[13]
       return self.readerEE.EvaluateMVA("BDT")
 
 

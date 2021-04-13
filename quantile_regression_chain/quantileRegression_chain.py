@@ -34,7 +34,7 @@ class quantileRegression_chain(object):
 
     def __init__(self,year,EBEE,workDir,varrs, quantiles = None):
 
-        self.year = year
+        self.year = str(year)
         self.workDir = os.path.abspath(workDir)
         self.kinrho = ['probePt','probeScEta','probePhi','rho']
         if not type(varrs) is list:
@@ -46,7 +46,12 @@ class quantileRegression_chain(object):
             self.quantiles = quantiles
         self.backend = 'loky'
         self.EBEE = EBEE
-        self.branches = ['probeScEta','probeEtaWidth_Sc','probeR9','weight','probeSigmaRR','tagChIso03','probeChIso03','probeS4','tagR9','tagPhiWidth_Sc','probePt','tagSigmaRR','probePhiWidth_Sc','probeChIso03worst','puweight','tagEleMatch','tagPhi','probeScEnergy','nvtx','probePhoIso','tagPhoIso','run','tagScEta','probeEleMatch','probeCovarianceIeIp','tagPt','rho','tagS4','tagSigmaIeIe','tagCovarianceIpIp','tagCovarianceIeIp','tagScEnergy','tagChIso03worst','probeSigmaIeIe','probePhi','mass','probeCovarianceIpIp','tagEtaWidth_Sc','probeHoE','probeFull5x5_e1x5','probeFull5x5_e5x5','probeNeutIso','probePassEleVeto']
+        self.branches = ['probeScEta','probeEtaWidth','probeR9','weight','probeSigmaRR','tagChIso03','probeChIso03','probeS4','tagR9','tagPhiWidth_Sc','probePt','tagSigmaRR','probePhiWidth','probeChIso03worst','puweight','tagEleMatch','tagPhi','probeScEnergy','nvtx','probePhoIso','tagPhoIso','run','tagScEta','probeEleMatch','probeCovarianceIeIp','tagPt','rho','tagS4','tagSigmaIeIe','tagCovarianceIpIp','tagCovarianceIeIp','tagScEnergy','tagChIso03worst','probeSigmaIeIe','probePhi','mass','probeCovarianceIpIp','tagEtaWidth_Sc','probeHoE','probeFull5x5_e1x5','probeFull5x5_e5x5','probeNeutIso','probePassEleVeto']
+
+        # In UL2018 we also need to correct this variable for EE
+        if self.year == '2018' and self.EBEE == 'EE':
+            print("Including phoIdMVA_esEnovSCRawEn")
+            self.branches = self.branches + ['phoIdMVA_esEnovSCRawEn']
 
         if year == '2016':
             self.branches = self.branches + ['probePass_invEleVeto','probeCovarianceIetaIphi','probeCovarianceIphiIphi','probeCovarianceIetaIphi','probeCovarianceIphiIphi']
@@ -93,7 +98,15 @@ class quantileRegression_chain(object):
         if self.year == '2016' and 'Data' not in tree:
             df = up_tree.arrays(self.branches + ['probePhoIso_corr'], library = 'pd')
         else:
-            df = up_tree.arrays(self.branches, library = 'pd')
+            # Import everything inside the dataframes (i.e., self.branches not used)
+            df = up_tree.arrays(library = 'pd')
+
+        # In data, probePhiWith and probeEta Width have suffix _Sc ¯\_(ツ)_/¯
+        if "data" in outname:
+            print('data found in outname when producing {}'.format(outname))
+            df.drop('probePhiWidth', axis='columns', inplace=True)
+            df.drop('probeEtaWidth', axis='columns', inplace=True)
+            df.rename(columns={'probePhiWidth_Sc': 'probePhiWidth', 'probeEtaWidth_Sc': 'probeEtaWidth'}, inplace=True)
 
         logger.info('Dataframe with columns {}'.format(df.columns))
         index = np.array(df.index)
@@ -295,7 +308,8 @@ class quantileRegression_chain(object):
             Specify if variable to be corrected is discontinuous. Only for ``quantileRegression_chain_disc``
         """
 
-        var_raw = var[:var.find('_')] if '_' in var else var
+        # This relied on the variables names to not have an underscore... and of course I dumped the new one with an underscore in the name...
+        var_raw = var.rpartition('_')[0] if '_' in var else var
         features = self.kinrho + ['{}_corr'.format(x) for x in self.vars[:self.vars.index(var_raw)]]
         X = self.MC.loc[:,features]
         Y = self.MC[var]
@@ -405,7 +419,11 @@ class quantileRegression_chain(object):
         diz : bool, default ``False``
             Specifies if variable to be corrected is discontinuous. Only used by ``quantileRegression_chain_disc``
         """
-        var_raw = var[:var.find('_')] if '_' in var else var
+        # Same as before, underscore in the variable name
+        if '_shift_final' in var:
+            var_raw = var.replace('_shift_final', '')
+        else:
+            var_raw = var.rpartition('_')[0] if '_' in var else var
         features = self.kinrho + self.vars
         if diz:
             X = self.MC.loc[self.MC[var] != 0.,features].values
