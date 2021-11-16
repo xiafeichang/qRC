@@ -9,13 +9,13 @@ dataframes:
     df_mc_EE_train.h5
 
 variables:
-  ['probeCovarianceIeIp','probeS4','probeR9','probePhiWidth','probeSigmaIeIe','probeEtaWidth']
+  ['probeCovarianceIeIp','probeS4','probeR9','probePhiWidth_Sc','probeSigmaIeIe','probeEtaWidth_Sc']
 
 year:
   2018
 
 workDir:
-  /path_to_workDir
+  /work/xchang/tmp/tnp
 
 weightsDir:
-  /path_to_weightsDir
+  /work/xchang/weights/2018
