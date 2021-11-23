@@ -6,17 +6,10 @@ Train 508 regressors.
 
 For each of the 6 variables the 21 quantiles are trained in parallel. The output of the 21 quantiles for the *n*-th variable becomes the input for the 21 quantiles for variable *n*-th + 1.
 At the level of quantiles, the parallelization is performed is done internally using either Ray or IPyParallel.
-Firstly, start the cluster: 
+Assuming we want to train for the barrel using 4700000 events using Ray as a backend (with a cluster running at the address ```192.33.123.23:6379```) we run the following command:
 ```bash
-ray start --head --port=6379 --num-cpus 1 --block
+$ python train_qRC_MC.py --EBEE EB --config config/config_qRC_training_5M.yaml --n_evts 4700000 --backend Ray --clusterid 192.33.123.23:6379
 ```
-Note: `aioredis` version < 2! 
-
-Assuming we want to train for the barrel using 4700000 events using Ray as a backend (with a cluster running at the address `192.33.123.29:6379`) we run the following command:
-```bash
-$ python train_qRC_MC.py --EBEE EB --config config/config_qRC_training_5M.yaml --n_evts 4700000 --backend Ray --clusterid 192.33.123.29:6379
-```
-By the time of writing, a warning says 'X does not have valid features...' appear when executing `clf.predict(X)`. The reason is not known yet, it may relate to the version of `sklearn`
 
 ## Isolations
 

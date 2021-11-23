@@ -1,0 +1,46 @@
+Traceback (most recent call last):
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/redis/connection.py", line 559, in connect
+    sock = self._connect()
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/redis/connection.py", line 615, in _connect
+    raise err
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/redis/connection.py", line 603, in _connect
+    sock.connect(socket_address)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/ray/_private/services.py", line 666, in wait_for_redis_to_start
+    redis_client.client_list()
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/redis/client.py", line 1194, in client_list
+    return self.execute_command('CLIENT LIST')
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/redis/client.py", line 898, in execute_command
+    conn = self.connection or pool.get_connection(command_name, **options)
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/redis/connection.py", line 1192, in get_connection
+    connection.connect()
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/redis/connection.py", line 563, in connect
+    raise ConnectionError(self._error_message(e))
+redis.exceptions.ConnectionError: Error 111 connecting to 192.33.123.23:6379. Connection refused.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/work/xchang/anaconda3/envs/CQR/bin/ray", line 33, in <module>
+    sys.exit(load_entry_point('ray==1.4.0', 'console_scripts', 'ray')())
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/ray/scripts/scripts.py", line 1808, in main
+    return cli()
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/click/core.py", line 1128, in __call__
+    return self.main(*args, **kwargs)
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/click/core.py", line 1053, in main
+    rv = self.invoke(ctx)
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/click/core.py", line 1659, in invoke
+    return _process_result(sub_ctx.command.invoke(sub_ctx))
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/click/core.py", line 1395, in invoke
+    return ctx.invoke(self.callback, **ctx.params)
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/click/core.py", line 754, in invoke
+    return __callback(*args, **kwargs)
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/ray/scripts/scripts.py", line 656, in start
+    redis_address_ip, redis_address_port, password=redis_password)
+  File "/work/xchang/anaconda3/envs/CQR/lib/python3.7/site-packages/ray/_private/services.py", line 688, in wait_for_redis_to_start
+    " attempts to ping the Redis server.") from connEx
+RuntimeError: Unable to connect to Redis at 192.33.123.23:6379 after 12 retries. Check that 192.33.123.23:6379 is reachable from this machine. If it is not, your firewall may be blocking this port. If the problem is a flaky connection, try setting the environment variable `RAY_START_REDIS_WAIT_RETRIES` to increase the number of attempts to ping the Redis server.

@@ -26,10 +26,6 @@ def main(args):
     qRC.loadROOT(
             '{}/outputMC.root'.format(sourceDir),
             'tagAndProbeDumper/DYJetsToLL_amcatnloFXFX_13TeV_All',
-<<<<<<< HEAD
-=======
-#            'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All',
->>>>>>> 365316ecab26a75f06aafc1f0d0ede61525c54a8
             'df_mc_{}'.format(qRC.EBEE),
             'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeChIso03<6 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
             split
@@ -37,10 +33,6 @@ def main(args):
     qRC.loadROOT(
             '{}/outputData.root'.format(sourceDir),
             'tagAndProbeDumper/Data_13TeV_All',
-<<<<<<< HEAD
-=======
-#            'tagAndProbeDumper/trees/Data_13TeV_All',
->>>>>>> 365316ecab26a75f06aafc1f0d0ede61525c54a8
             'df_data_{}'.format(qRC.EBEE),
             'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeChIso03<6 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
             split
@@ -50,10 +42,6 @@ def main(args):
         qRC.loadROOT(
                 '{}/outputMC.root'.format(sourceDir),
                 'tagAndProbeDumper/DYJetsToLL_amcatnloFXFX_13TeV_All',
-<<<<<<< HEAD
-=======
-#                'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All',
->>>>>>> 365316ecab26a75f06aafc1f0d0ede61525c54a8
                 'df_mc_{}_Iso'.format(qRC.EBEE),
                 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.0105 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
                 split
@@ -61,10 +49,6 @@ def main(args):
         qRC.loadROOT(
                 '{}/outputData.root'.format(sourceDir),
                 'tagAndProbeDumper/Data_13TeV_All',
-<<<<<<< HEAD
-=======
-#                'tagAndProbeDumper/trees/Data_13TeV_All',
->>>>>>> 365316ecab26a75f06aafc1f0d0ede61525c54a8
                 'df_data_{}_Iso'.format(qRC.EBEE),
                 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.0105 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
                 split
@@ -73,10 +57,6 @@ def main(args):
         qRC.loadROOT(
                 '{}/outputMC.root'.format(sourceDir),
                 'tagAndProbeDumper/DYJetsToLL_amcatnloFXFX_13TeV_All',
-<<<<<<< HEAD
-=======
-#                'tagAndProbeDumper/trees/DYJetsToLL_amcatnloFXFX_13TeV_All',
->>>>>>> 365316ecab26a75f06aafc1f0d0ede61525c54a8
                 'df_mc_{}_Iso'.format(qRC.EBEE),
                 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.028 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
                 split
@@ -84,10 +64,6 @@ def main(args):
         qRC.loadROOT(
                 '{}/outputData.root'.format(sourceDir),
                 'tagAndProbeDumper/Data_13TeV_All',
-<<<<<<< HEAD
-=======
-#                'tagAndProbeDumper/trees/Data_13TeV_All',
->>>>>>> 365316ecab26a75f06aafc1f0d0ede61525c54a8
                 'df_data_{}_Iso'.format(qRC.EBEE),
                 'tagPt>40 and tagR9>0.8 and mass>80 and mass<100 and probeSigmaIeIe<0.028 and tagScEta>-2.1 and tagScEta<2.1 and probePassEleVeto==0',
                 split
