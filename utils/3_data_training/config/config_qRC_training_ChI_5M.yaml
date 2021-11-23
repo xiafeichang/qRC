@@ -15,7 +15,7 @@ year:
   2018
 
 workDir:
-  /path_to_workDir
+  /work/xchang/tmp/tnp
 
 weightsDir:
-  /path_to_weightsDir
+  /work/xchang/weights/2018
