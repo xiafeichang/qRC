@@ -16,6 +16,7 @@ Assuming we want to train for the barrel using 4700000 events using Ray as a bac
 ```bash
 $ python train_qRC_MC.py --EBEE EB --config config/config_qRC_training_5M.yaml --n_evts 4700000 --backend Ray --clusterid 192.33.123.29:6379
 ```
+By the time of writing, a warning says 'X does not have valid features...' appear when executing `clf.predict(X)`. The reason is not known yet, it may relate to the version of `sklearn`
 
 ## Isolations
 
