@@ -52,3 +52,6 @@ docs/_build/
 # vim
 *.swp
 *.swo
+
+# output file of SLURM
+*.out

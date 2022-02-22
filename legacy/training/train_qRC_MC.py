@@ -24,6 +24,9 @@ def main(options):
     qRC = QReg_C.quantileRegression_chain(year,options.EBEE,workDir,variables)
     if options.backend is not None:
         qRC.setupJoblib(options.backend,options.clusterid)
+
+# add setup_cluster() and setup_client() here
+
     qRC.loadMCDF(df_name_mc,0,options.n_evts,rsh=False)
     qRC.loadDataDF(df_name_data,0,options.n_evts,rsh=False)
     qRC.trainAllMC(weightsDir=weightsDir,n_jobs=21)

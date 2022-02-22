@@ -19,9 +19,7 @@ from .tmva.eleIdMVAComputer import eleIdMvaComputer, helpComputeEleIdMva
 from .Corrector import Corrector, applyCorrection
 #from sklearn.externals.joblib import Parallel, parallel_backend, register_parallel_backend
 
-<<<<<<< HEAD
 from .qrnn import trainQuantile, predict
-=======
 from itertools import product
 
 import logging
@@ -310,7 +308,6 @@ class quantileRegression_chain(object):
         del cluster
 
     def correctY(self, var, clusterconfig=None, diz=False):
-=======
         futures = []
         for quantile, var in product(self.quantiles, variables):
             features, X, Y = get_tpl(var)
